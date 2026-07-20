@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta name="referrer" content="no-referrer">
 <title>Simulador de Riesgos Monte Carlo — Excel</title>
 <meta name="description" content="Carga tu archivo de Excel, asigna distribuciones de probabilidad a las celdas de entrada y obtén la distribución y el análisis estadístico completo de tus celdas de salida. Simulación Monte Carlo gratuita, 100 % en tu navegador.">
 <link rel="canonical" href="https://montecarlo.inicon.com.co/">
@@ -1484,8 +1487,8 @@ function renderSeleccion(){
   const esSalida = salidas.some(s => s.clave === clave);
   let info = `<b>${seleccion.hoja}!${seleccion.ref}</b> · `;
   if (!c) info += 'celda vacía';
-  else if (c.formula) info += `fórmula${c.estatica ? ' <span style="color:#b26a00">(no recalculable: ' + escapeHtml(c.motivo) + ')</span>' : ''} — valor actual: <b>${formatoCelda(c.valorOriginal)}</b>`;
-  else info += `valor: <b>${formatoCelda(c.valorOriginal)}</b>`;
+  else if (c.formula) info += `fórmula${c.estatica ? ' <span style="color:#b26a00">(no recalculable: ' + escapeHtml(c.motivo) + ')</span>' : ''} — valor actual: <b>${escapeHtml(formatoCelda(c.valorOriginal))}</b>`;
+  else info += `valor: <b>${escapeHtml(formatoCelda(c.valorOriginal))}</b>`;
   if (esEntrada){
     const e = entradas.find(e => e.clave === clave);
     info += `<br>🟢 Entrada «${escapeHtml(e.nombre)}» — ${DISTS[e.dist].nombre}: ${DISTS[e.dist].resumen(e.params)}`;
