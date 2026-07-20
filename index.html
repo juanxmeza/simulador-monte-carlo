@@ -1,0 +1,2317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Riesgos Monte Carlo — Excel</title>
+<meta name="description" content="Carga tu archivo de Excel, asigna distribuciones de probabilidad a las celdas de entrada y obtén la distribución y el análisis estadístico completo de tus celdas de salida. Simulación Monte Carlo gratuita, 100 % en tu navegador.">
+<link rel="canonical" href="https://montecarlo.inicon.com.co/">
+<meta property="og:title" content="Simulador de Riesgos Monte Carlo para Excel">
+<meta property="og:description" content="Marca celdas de entrada y salida en tu propio archivo de Excel y obtén percentiles, histogramas, sensibilidad y análisis estadístico completo. Gratis y sin instalar nada.">
+<meta property="og:url" content="https://montecarlo.inicon.com.co/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_CO">
+<style>
+  :root{
+    --fondo:#f2f5fa; --tarjeta:#ffffff; --borde:#dde3ee; --texto:#1e2a3a; --texto2:#5b6b80;
+    --acento:#3050c8; --acento2:#4263eb; --verde:#2f9e44; --verdeClaro:#d9f2e0; --amarillo:#e8a308;
+    --rojo:#d6336c; --azulClaro:#dbe6ff;
+    --sombra:0 1px 3px rgba(30,42,58,.08),0 4px 14px rgba(30,42,58,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--fondo);color:var(--texto);line-height:1.5;font-size:15px}
+  header.cabecera{background:linear-gradient(135deg,#173a2e 0%,#1d6b45 55%,#2f9e44 100%);color:#fff;padding:22px 24px 26px}
+  header.cabecera h1{font-size:1.5rem;font-weight:700}
+  header.cabecera p{opacity:.88;max-width:920px;margin-top:6px;font-size:.93rem}
+  main{max-width:1500px;margin:0 auto;padding:18px 16px 60px}
+  .tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-radius:12px;box-shadow:var(--sombra);padding:16px;margin-bottom:14px}
+  .tarjeta h2{font-size:1rem;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .tarjeta h3{font-size:.92rem;margin:12px 0 6px}
+  label{display:block;font-size:.78rem;font-weight:600;color:var(--texto2);margin-bottom:3px}
+  input[type=number],input[type=text],select{width:100%;padding:7px 9px;border:1px solid var(--borde);border-radius:8px;
+    font-size:.88rem;color:var(--texto);background:#fbfcfe;outline:none}
+  input:focus,select:focus{border-color:var(--acento2);background:#fff}
+  button{font-family:inherit}
+  .btn{border:none;border-radius:9px;padding:10px 16px;font-size:.9rem;font-weight:700;cursor:pointer;transition:filter .15s}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn-primario{background:var(--acento);color:#fff}
+  .btn-verde{background:var(--verde);color:#fff}
+  .btn-secundario{background:#e7ecf7;color:var(--texto)}
+  .btn-peligro{background:#fdeef2;color:var(--rojo)}
+  .btn-mini{padding:4px 10px;font-size:.76rem;border-radius:7px}
+  /* ---- pantalla de carga ---- */
+  .zona-carga{border:2.5px dashed #b8c6e2;border-radius:14px;padding:46px 24px;text-align:center;color:var(--texto2);
+    background:#fbfcff;cursor:pointer;transition:all .15s}
+  .zona-carga:hover,.zona-carga.arrastre{border-color:var(--acento2);background:#eef3ff}
+  .zona-carga .icono{font-size:2.6rem;margin-bottom:8px}
+  /* ---- barra de herramientas ---- */
+  .barra-sup{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-bottom:10px}
+  .barra-sup .campo{min-width:130px}
+  .barra-sup .sep{flex:1}
+  .nombre-archivo{font-weight:700;font-size:.9rem;background:#e8f3ea;border:1px solid #bfe3c8;color:#1d6b45;
+    padding:8px 12px;border-radius:9px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* ---- barra de fórmulas ---- */
+  .barra-formulas{display:flex;gap:8px;margin-bottom:8px}
+  .barra-formulas .ref{width:120px;font-weight:700;text-align:center;background:#eef2fa;border:1px solid var(--borde);
+    border-radius:8px;padding:7px;font-size:.85rem}
+  .barra-formulas .contenido{flex:1;background:#fff;border:1px solid var(--borde);border-radius:8px;padding:7px 10px;
+    font-family:Consolas,monospace;font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#333}
+  /* ---- pestañas de hojas ---- */
+  .pestanas{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+  .pestanas button{border:1px solid var(--borde);border-bottom:none;background:#e9edf6;color:var(--texto2);
+    padding:6px 14px;border-radius:8px 8px 0 0;cursor:pointer;font-size:.82rem;font-weight:600}
+  .pestanas button.activa{background:#fff;color:var(--acento);border-color:var(--acento2)}
+  /* ---- rejilla ---- */
+  .disposicion{display:grid;grid-template-columns:1fr 330px;gap:14px;align-items:start}
+  @media (max-width:1080px){.disposicion{grid-template-columns:1fr}}
+  .contenedor-rejilla{overflow:auto;max-height:520px;border:1px solid var(--borde);border-radius:8px;background:#fff}
+  table.rejilla{border-collapse:separate;border-spacing:0;font-size:.8rem;table-layout:fixed}
+  table.rejilla th{position:sticky;background:#eef2fa;color:var(--texto2);font-weight:700;font-size:.72rem;
+    border:1px solid var(--borde);padding:3px 6px;z-index:2}
+  table.rejilla thead th{top:0}
+  table.rejilla tbody th{left:0;min-width:40px}
+  table.rejilla thead th:first-child{left:0;z-index:3}
+  table.rejilla td{border:1px solid #edf0f7;padding:3px 7px;min-width:82px;max-width:150px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;text-align:right;cursor:cell;background:#fff}
+  table.rejilla td.texto{text-align:left}
+  table.rejilla td.formula{color:#1a3f8f}
+  table.rejilla td.entrada{background:var(--verdeClaro);box-shadow:inset 0 0 0 1.5px var(--verde)}
+  table.rejilla td.salida{background:var(--azulClaro);box-shadow:inset 0 0 0 1.5px var(--acento2)}
+  table.rejilla td.estatica-adv{background:#fff4e0}
+  table.rejilla td.seleccionada{outline:2.5px solid #1e2a3a;outline-offset:-2px}
+  /* ---- panel lateral ---- */
+  .lista-defs{margin-top:6px}
+  .def-item{display:flex;align-items:center;gap:8px;border:1px solid var(--borde);border-radius:9px;padding:7px 9px;
+    margin-bottom:6px;font-size:.82rem;background:#fafbfe}
+  .def-item .punto{width:10px;height:10px;border-radius:50%;flex:none}
+  .def-item .info{flex:1;overflow:hidden}
+  .def-item .nom{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .def-item .det{color:var(--texto2);font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .leyenda{display:flex;gap:14px;font-size:.76rem;color:var(--texto2);margin-top:8px;flex-wrap:wrap}
+  .leyenda span{display:inline-flex;align-items:center;gap:5px}
+  .cuadrito{width:12px;height:12px;border-radius:3px;display:inline-block}
+  /* ---- alertas / progreso ---- */
+  #alertas{margin:8px 0}
+  .alerta{border-radius:9px;padding:9px 12px;font-size:.84rem;margin-bottom:6px}
+  .alerta.error{background:#fdeef0;color:#b02040;border:1px solid #f5c2ce}
+  .alerta.aviso{background:#fff6e0;color:#8a5d00;border:1px solid #f0dca0}
+  .alerta.info{background:#e9f3ff;color:#1c4f8a;border:1px solid #bcd8f5}
+  .progreso{height:10px;background:#e4e9f3;border-radius:6px;overflow:hidden;display:none;margin:8px 0}
+  .progreso .barra{height:100%;width:0;background:linear-gradient(90deg,var(--acento2),#7a92f5);transition:width .1s}
+  .texto-progreso{font-size:.8rem;color:var(--texto2);display:none;margin-bottom:8px}
+  /* ---- resultados ---- */
+  .tarjetas-resumen{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+  .tarjeta-metrica{background:var(--tarjeta);border:1px solid var(--borde);border-radius:11px;padding:11px 12px;box-shadow:var(--sombra)}
+  .tarjeta-metrica .etiqueta{font-size:.7rem;text-transform:uppercase;letter-spacing:.4px;color:var(--texto2);font-weight:700}
+  .tarjeta-metrica .valor{font-size:1.12rem;font-weight:800;margin-top:3px;word-break:break-word}
+  .tarjeta-metrica .detalle{font-size:.73rem;color:var(--texto2);margin-top:2px}
+  .pestanas-salidas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .pestanas-salidas button{border:1px solid var(--borde);background:#fff;color:var(--texto2);padding:7px 14px;
+    border-radius:20px;cursor:pointer;font-size:.84rem;font-weight:700}
+  .pestanas-salidas button.activa{background:var(--acento);border-color:var(--acento);color:#fff}
+  .rejilla-graficos{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:820px){.rejilla-graficos{grid-template-columns:1fr}}
+  canvas.grafico{width:100%;display:block}
+  table.tabla{width:100%;border-collapse:collapse;font-size:.84rem}
+  table.tabla th,table.tabla td{padding:6px 9px;border-bottom:1px solid var(--borde);text-align:right}
+  table.tabla th:first-child,table.tabla td:first-child{text-align:left}
+  table.tabla th{background:#f2f5fb;color:var(--texto2);font-size:.74rem;text-transform:uppercase}
+  .certeza{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:8px}
+  .certeza .campo{width:140px}
+  .certeza .resultado{font-size:1.05rem;font-weight:800;color:var(--acento);padding:6px 10px}
+  .nota{font-size:.8rem;color:var(--texto2);background:#f4f6fb;border-left:3px solid var(--acento2);
+    padding:8px 10px;border-radius:0 8px 8px 0;margin-top:8px}
+  details.explicaciones{margin-top:8px}
+  details.explicaciones summary{cursor:pointer;font-weight:700;font-size:.9rem;color:var(--acento)}
+  details.explicaciones dt{font-weight:700;font-size:.85rem;margin-top:8px}
+  details.explicaciones dd{font-size:.84rem;color:var(--texto2);margin-left:0}
+  /* ---- modal ---- */
+  .velo{position:fixed;inset:0;background:rgba(20,28,45,.45);display:none;align-items:center;justify-content:center;z-index:40;padding:16px}
+  .velo.visible{display:flex}
+  .modal{background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);max-width:560px;width:100%;
+    max-height:92vh;overflow:auto;padding:18px}
+  .modal h2{font-size:1.02rem;margin-bottom:4px}
+  .modal .sub{font-size:.8rem;color:var(--texto2);margin-bottom:12px}
+  .modal .fila{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .modal .fila.c3{grid-template-columns:1fr 1fr 1fr}
+  .vista-dist{background:linear-gradient(180deg,#fdfff4,#f2fbe8);border:1px solid #d8e8c8;border-radius:10px;padding:8px;margin-bottom:10px}
+  .stats-dist{display:flex;gap:16px;font-size:.78rem;color:var(--texto2);justify-content:center;margin-top:4px}
+  .modal .acciones-modal{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+  /* ---- educativo / pie ---- */
+  .seccion-educativa{margin-top:26px}
+  .seccion-educativa h2{font-size:1.12rem;margin-bottom:12px}
+  .rejilla-edu{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .rejilla-edu .tarjeta{margin-bottom:0}
+  .rejilla-edu h3{margin-top:0;font-size:.95rem;color:var(--acento)}
+  .rejilla-edu p{font-size:.85rem;color:var(--texto2);margin-top:6px}
+  footer.pie-legal{background:#15181d;color:#c7cdd6;margin-top:30px}
+  .aviso-legal{max-width:1360px;margin:0 auto;padding:18px 24px 14px;display:flex;gap:12px;align-items:flex-start;
+    border-bottom:1px solid #2a2f37;font-size:.8rem;line-height:1.55;text-align:justify}
+  .aviso-legal .icono-aviso{flex:none;font-size:1.05rem;line-height:1.4}
+  .aviso-legal b{color:#f0f2f5}
+  .creditos{max-width:1360px;margin:0 auto;padding:12px 24px 16px;text-align:center;font-size:.8rem;color:#aab2bd}
+  .creditos a{color:#6ea8ff;text-decoration:none}
+  .creditos a:hover{text-decoration:underline}
+  #tooltip{position:fixed;pointer-events:none;background:#1e2a3a;color:#fff;padding:6px 10px;border-radius:7px;
+    font-size:.78rem;z-index:60;display:none;max-width:280px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+</style>
+</head>
+<body>
+
+<header class="cabecera">
+  <h1>📊 Simulador de Riesgos Monte Carlo para Excel</h1>
+  <p>Carga tu libro de Excel (.xlsx), marca las celdas de <b>entrada</b> con su distribución de probabilidad y las celdas de
+  <b>salida</b> que quieres analizar. La simulación recalcula las fórmulas de tu modelo miles de veces y entrega la
+  distribución de probabilidad y el análisis estadístico completo de cada salida.</p>
+</header>
+
+<main>
+  <!-- ============ PANTALLA DE CARGA ============ -->
+  <section id="pantallaCarga">
+    <div class="tarjeta">
+      <div class="zona-carga" id="zonaCarga">
+        <div class="icono">📂</div>
+        <h3>Arrastra aquí tu archivo de Excel (.xlsx)</h3>
+        <p style="margin:6px 0 14px">o haz clic para seleccionarlo desde tu equipo</p>
+        <button class="btn btn-primario" type="button">Seleccionar archivo…</button>
+      </div>
+      <input type="file" id="inputArchivo" accept=".xlsx" style="display:none">
+      <div style="text-align:center;margin-top:12px">
+        <button class="btn btn-verde" id="btnEjemploLibro">🧪 ¿No tienes archivo? Genera un modelo de ejemplo</button>
+      </div>
+      <div class="nota">Formato soportado: <b>.xlsx</b> (Excel 2007 o posterior). Si tu archivo es .xls antiguo,
+      ábrelo en Excel y guárdalo como .xlsx. El archivo se procesa localmente en tu navegador: no se envía a ningún servidor.</div>
+    </div>
+  </section>
+
+  <!-- ============ APLICACIÓN ============ -->
+  <section id="app" style="display:none">
+    <div class="tarjeta">
+      <div class="barra-sup">
+        <div class="nombre-archivo" id="nombreArchivo">—</div>
+        <button class="btn btn-peligro btn-mini" id="btnQuitarArchivo" style="align-self:center">Quitar archivo</button>
+        <div class="sep"></div>
+        <div class="campo">
+          <label for="selIteraciones">Iteraciones</label>
+          <select id="selIteraciones">
+            <option value="1000">1.000</option>
+            <option value="5000">5.000</option>
+            <option value="10000" selected>10.000</option>
+            <option value="50000">50.000</option>
+            <option value="manual">Manual…</option>
+          </select>
+        </div>
+        <div class="campo" id="cajaIterManual" style="display:none">
+          <label for="inpIterManual">Nº manual</label>
+          <input type="number" id="inpIterManual" min="100" max="1000000" step="100" value="20000">
+        </div>
+        <div class="campo">
+          <label for="inpSemilla">Semilla (opcional)</label>
+          <input type="number" id="inpSemilla" placeholder="Aleatoria" step="1">
+        </div>
+        <button class="btn btn-primario" id="btnEjecutar">▶ Ejecutar simulación</button>
+        <button class="btn btn-secundario" id="btnRestablecer">Restablecer</button>
+        <button class="btn btn-secundario" id="btnCSV" disabled>Exportar CSV</button>
+        <button class="btn btn-secundario" id="btnInforme" disabled>Generar informe</button>
+      </div>
+      <div id="alertas"></div>
+      <div class="progreso" id="cajaProgreso"><div class="barra" id="barraProgreso"></div></div>
+      <div class="texto-progreso" id="textoProgreso"></div>
+
+      <div class="barra-formulas">
+        <div class="ref" id="refSeleccion">—</div>
+        <div class="contenido" id="contenidoSeleccion"></div>
+      </div>
+      <div class="pestanas" id="pestanasHojas"></div>
+
+      <div class="disposicion">
+        <div>
+          <div class="contenedor-rejilla" id="contenedorRejilla"></div>
+          <div class="leyenda">
+            <span><span class="cuadrito" style="background:var(--verdeClaro);border:1.5px solid var(--verde)"></span> Celda de entrada (supuesto)</span>
+            <span><span class="cuadrito" style="background:var(--azulClaro);border:1.5px solid var(--acento2)"></span> Celda de salida (pronóstico)</span>
+            <span><span class="cuadrito" style="background:#fff;border:1px solid var(--borde)"></span> Valor</span>
+            <span style="color:#1a3f8f">Azul = celda con fórmula</span>
+            <span><span class="cuadrito" style="background:#fff4e0;border:1px solid #f0dca0"></span> Fórmula no recalculable (usa valor guardado)</span>
+          </div>
+        </div>
+        <aside>
+          <div class="tarjeta" style="margin-bottom:10px">
+            <h2>🎯 Celda seleccionada</h2>
+            <div id="infoCelda" style="font-size:.85rem;color:var(--texto2)">Haz clic en una celda de la hoja.</div>
+            <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap" id="botonesCelda"></div>
+          </div>
+          <div class="tarjeta" style="margin-bottom:10px">
+            <h2>🟢 Entradas <span id="numEntradas" style="font-weight:400;color:var(--texto2);font-size:.8rem"></span></h2>
+            <div class="lista-defs" id="listaEntradas"><p style="font-size:.8rem;color:var(--texto2)">Sin entradas definidas.</p></div>
+          </div>
+          <div class="tarjeta" style="margin-bottom:0">
+            <h2>🔵 Salidas <span id="numSalidas" style="font-weight:400;color:var(--texto2);font-size:.8rem"></span></h2>
+            <div class="lista-defs" id="listaSalidas"><p style="font-size:.8rem;color:var(--texto2)">Sin salidas definidas.</p></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <section id="panelResultados"></section>
+  </section>
+
+  <!-- ============ SECCIÓN EDUCATIVA ============ -->
+  <section class="seccion-educativa">
+    <h2>📚 Aprende a interpretar la simulación</h2>
+    <div class="rejilla-edu">
+      <div class="tarjeta">
+        <h3>¿Qué es la simulación de Monte Carlo?</h3>
+        <p>En lugar de calcular tu modelo una sola vez con valores fijos, se recalcula miles de veces tomando en cada
+        repetición valores aleatorios de las celdas inciertas, según la distribución que les asignes. El conjunto de
+        resultados forma una <b>distribución</b>: muestra qué valores puede tomar cada salida y con qué probabilidad.</p>
+      </div>
+      <div class="tarjeta">
+        <h3>¿Cómo interpretar los percentiles?</h3>
+        <p>El percentil <b>P10</b> es el valor por debajo del cual queda el 10&nbsp;% de las simulaciones; el <b>P50</b>
+        (mediana) divide los resultados por la mitad; el <b>P90</b> deja el 90&nbsp;% por debajo. Cuanto más separados
+        estén P10 y P90, mayor es la incertidumbre de esa salida.</p>
+      </div>
+      <div class="tarjeta">
+        <h3>Una probabilidad no garantiza un resultado</h3>
+        <p>Que un escenario tenga 90&nbsp;% de probabilidad no significa que vaya a ocurrir: 1 de cada 10 veces ocurrirá lo
+        contrario. Y la simulación no es mejor que sus supuestos: si las distribuciones de entrada están mal estimadas,
+        los resultados heredan ese error. Úsala para <b>comparar alternativas y dimensionar reservas</b>, no como una
+        predicción exacta.</p>
+      </div>
+      <div class="tarjeta">
+        <h3>Limitaciones de esta herramienta</h3>
+        <p>El motor recalcula las funciones más habituales (SUMA, SI, PROMEDIO, BUSCARV, VNA, TIR, SUMAPRODUCTO…, en su
+        forma interna en inglés). Las fórmulas no soportadas conservan el último valor guardado por Excel y se marcan en
+        naranja. Las entradas se muestrean de forma <b>independiente</b> (sin correlaciones entre ellas).</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="pie-legal">
+  <div class="aviso-legal">
+    <span class="icono-aviso">⚠️</span>
+    <p><b>Aviso legal.</b> Esta es una herramienta gratuita de simulación, con fines exclusivamente educativos e
+    ilustrativos. Los resultados dependen por completo de los supuestos que ingresa cada usuario y
+    <b>no constituyen asesoría financiera, contable, tributaria ni legal, ni recomendaciones de inversión</b>.
+    Ninguna decisión de inversión o de negocio debe tomarse únicamente con base en esta herramienta: valide siempre con
+    estudios propios y asesores profesionales. Su uso queda sujeto al criterio y a la responsabilidad exclusiva de quien
+    la utiliza. La herramienta se ofrece “tal cual”, sin garantía de ningún tipo, y el autor no asume responsabilidad
+    alguna por errores, omisiones o decisiones tomadas a partir de sus resultados.</p>
+  </div>
+  <div class="creditos">
+    © Juan Carlos Meza · Contenido bajo licencia
+    <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.es" target="_blank" rel="license noopener">CC BY-SA 4.0</a>
+    · ¿Algo no te ha funcionado o falta algo?
+    <a href="mailto:juanxmeza@gmail.com">Escríbeme</a>
+  </div>
+</footer>
+
+<!-- ============ MODAL DE DISTRIBUCIÓN ============ -->
+<div class="velo" id="veloModal">
+  <div class="modal">
+    <h2 id="tituloModal">Propiedades de la entrada</h2>
+    <div class="sub" id="subModal"></div>
+    <div class="fila">
+      <div><label>Nombre del supuesto</label><input type="text" id="mNombre"></div>
+      <div><label>Distribución</label>
+        <select id="mDist">
+          <option value="normal">Normal</option>
+          <option value="triangular">Triangular</option>
+          <option value="uniforme">Uniforme</option>
+          <option value="lognormal">Lognormal</option>
+          <option value="pert">PERT (Beta)</option>
+          <option value="exponencial">Exponencial</option>
+        </select>
+      </div>
+    </div>
+    <div class="vista-dist">
+      <canvas id="canvasDist" width="500" height="150" style="width:100%"></canvas>
+      <div class="stats-dist"><span id="mMediaTeorica"></span><span id="mSdTeorica"></span></div>
+    </div>
+    <div class="fila c3" id="mCampos"></div>
+    <div id="mError" style="color:var(--rojo);font-size:.8rem;margin-bottom:6px"></div>
+    <div class="acciones-modal">
+      <button class="btn btn-secundario" id="mCancelar">Cancelar</button>
+      <button class="btn btn-primario" id="mAceptar">Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+'use strict';
+/* ============================================================
+   UTILIDADES: aleatorios y estadística
+   ============================================================ */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function randNormal(rng){
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+function randTriangular(min, moda, max, rng){
+  const u = rng(), f = (moda - min) / (max - min);
+  return u < f ? min + Math.sqrt(u * (max - min) * (moda - min))
+               : max - Math.sqrt((1 - u) * (max - min) * (max - moda));
+}
+function randLognormal(media, sd, rng){
+  if (media <= 0) return 0;
+  const s2 = Math.log(1 + (sd * sd) / (media * media));
+  const mu = Math.log(media) - s2 / 2;
+  return Math.exp(mu + Math.sqrt(s2) * randNormal(rng));
+}
+function randGamma(a, rng){
+  if (a < 1) return randGamma(a + 1, rng) * Math.pow(rng() || 1e-12, 1 / a);
+  const d = a - 1/3, c = 1 / Math.sqrt(9 * d);
+  for (;;){
+    let x, v;
+    do { x = randNormal(rng); v = 1 + c * x; } while (v <= 0);
+    v = v * v * v;
+    const u = rng();
+    if (u < 1 - 0.0331 * x*x*x*x) return d * v;
+    if (Math.log(u) < 0.5*x*x + d*(1 - v + Math.log(v))) return d * v;
+  }
+}
+function randBeta(a, b, rng){ const x = randGamma(a, rng), y = randGamma(b, rng); return x / (x + y); }
+function logGamma(x){
+  const g = [76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];
+  let s = 1.000000000190015, t = x + 5.5;
+  t -= (x + 0.5) * Math.log(t);
+  for (let j = 0; j < 6; j++) s += g[j] / (x + 1 + j);
+  return -t + Math.log(2.5066282746310005 * s / x);
+}
+function percentil(ordenado, p){
+  const n = ordenado.length;
+  if (!n) return NaN;
+  const idx = (p / 100) * (n - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return ordenado[lo];
+  return ordenado[lo] + (ordenado[hi] - ordenado[lo]) * (idx - lo);
+}
+function estadisticas(orden){
+  const n = orden.length;
+  let s = 0; for (let i=0;i<n;i++) s += orden[i];
+  const media = s / n;
+  let m2=0,m3=0,m4=0;
+  for (let i=0;i<n;i++){ const d=orden[i]-media; const d2=d*d; m2+=d2; m3+=d2*d; m4+=d2*d2; }
+  m2/=n; m3/=n; m4/=n;
+  const sd = Math.sqrt(m2 * n / (n-1 || 1));
+  return { n, media, sd,
+    varianza: sd*sd,
+    sesgo: m2>0 ? m3/Math.pow(m2,1.5) : 0,
+    curtosis: m2>0 ? m4/(m2*m2)-3 : 0,
+    min: orden[0], max: orden[n-1],
+    cv: media!==0 ? sd/Math.abs(media) : NaN,
+    errorEst: sd/Math.sqrt(n) };
+}
+function fraccionMenorQue(ordenado, x){
+  let lo = 0, hi = ordenado.length;
+  while (lo < hi){ const m = (lo + hi) >> 1; if (ordenado[m] < x) lo = m + 1; else hi = m; }
+  return lo / ordenado.length;
+}
+function rangosPromedio(arr){
+  const n = arr.length;
+  const idx = Array.from({length:n}, (_,i)=>i).sort((a,b)=>arr[a]-arr[b]);
+  const r = new Float64Array(n);
+  let i = 0;
+  while (i < n){
+    let j = i;
+    while (j+1 < n && arr[idx[j+1]] === arr[idx[i]]) j++;
+    const prom = (i + j) / 2 + 1;
+    for (let k=i;k<=j;k++) r[idx[k]] = prom;
+    i = j + 1;
+  }
+  return r;
+}
+function pearson(x, y){
+  const n = x.length;
+  let sx=0,sy=0; for(let i=0;i<n;i++){sx+=x[i];sy+=y[i];}
+  const mx=sx/n, my=sy/n;
+  let num=0,dx=0,dy=0;
+  for(let i=0;i<n;i++){ const a=x[i]-mx,b=y[i]-my; num+=a*b; dx+=a*a; dy+=b*b; }
+  return dx>0&&dy>0 ? num/Math.sqrt(dx*dy) : 0;
+}
+function spearman(x, y){ return pearson(rangosPromedio(x), rangosPromedio(y)); }
+/* ---------- formato ---------- */
+function fmtNum(v, dec){
+  if (v === null || v === undefined || !isFinite(v)) return '—';
+  if (dec === undefined){
+    const a = Math.abs(v);
+    dec = a === 0 ? 0 : a >= 1000 ? 0 : a >= 1 ? 2 : 4;
+  }
+  return new Intl.NumberFormat('es', { maximumFractionDigits: dec }).format(v);
+}
+function fmtPct(v, dec){ return fmtNum(v * 100, dec === undefined ? 1 : dec) + ' %'; }
+function etiquetaCorta(v){
+  const a = Math.abs(v);
+  if (a >= 1e9) return fmtNum(v/1e9,1)+' mM';
+  if (a >= 1e6) return fmtNum(v/1e6,1)+' M';
+  if (a >= 1e4) return fmtNum(v/1e3,0)+' k';
+  return fmtNum(v, a < 10 ? 2 : 0);
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+/* ---------- letras de columna ---------- */
+function idxACol(n){
+  let s = '';
+  while (n > 0){ const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+function colAIdx(letras){
+  let n = 0;
+  for (const ch of letras.toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n;
+}
+/* ============================================================
+   LECTURA DE ZIP (.xlsx) con DecompressionStream nativo
+   ============================================================ */
+async function descomprimirZip(buffer){
+  const dv = new DataView(buffer);
+  const u8 = new Uint8Array(buffer);
+  let eocd = -1;
+  const tope = Math.max(0, buffer.byteLength - 22 - 65536);
+  for (let i = buffer.byteLength - 22; i >= tope; i--){
+    if (dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('El archivo no es un .xlsx válido (no se encontró la estructura ZIP).');
+  const nEntradas = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  const dec = new TextDecoder();
+  const indice = {};
+  for (let e = 0; e < nEntradas; e++){
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    const metodo = dv.getUint16(off + 10, true);
+    const tamComp = dv.getUint32(off + 20, true);
+    const tamNom = dv.getUint16(off + 28, true);
+    const tamExtra = dv.getUint16(off + 30, true);
+    const tamCom = dv.getUint16(off + 32, true);
+    const offLocal = dv.getUint32(off + 42, true);
+    const nombre = dec.decode(u8.subarray(off + 46, off + 46 + tamNom));
+    indice[nombre] = { metodo, tamComp, offLocal };
+    off += 46 + tamNom + tamExtra + tamCom;
+  }
+  const archivos = {};
+  for (const nombre in indice){
+    if (!/\.(xml|rels)$/i.test(nombre)) continue;   /* solo XML: hojas, cadenas, relaciones */
+    const a = indice[nombre];
+    const nLoc = dv.getUint16(a.offLocal + 26, true);
+    const eLoc = dv.getUint16(a.offLocal + 28, true);
+    const ini = a.offLocal + 30 + nLoc + eLoc;
+    const datos = u8.subarray(ini, ini + a.tamComp);
+    if (a.metodo === 0) archivos[nombre] = dec.decode(datos);
+    else if (a.metodo === 8){
+      const resp = new Response(new Blob([datos]).stream().pipeThrough(new DecompressionStream('deflate-raw')));
+      archivos[nombre] = dec.decode(new Uint8Array(await resp.arrayBuffer()));
+    } else throw new Error('Método de compresión ZIP no soportado (' + a.metodo + ').');
+  }
+  return archivos;
+}
+function parsearXml(texto){
+  const doc = new DOMParser().parseFromString(texto, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('XML dañado dentro del archivo.');
+  return doc;
+}
+/* ============================================================
+   MODELO DEL LIBRO
+   celdas: Map "Hoja!A1" -> { hoja, ref, fila, col, valor, valorOriginal,
+            formula, ast, deps[], estatica, motivo }
+   ============================================================ */
+let libro = null;   /* { nombreArchivo, hojas:[{nombre, maxFila, maxCol}], celdas:Map, ordenTopo:[], dependientes:Map, avisosCarga:[] } */
+function claveDe(hoja, ref){ return hoja + '!' + ref; }
+function celdaEn(hoja, col, fila){ return libro.celdas.get(claveDe(hoja, idxACol(col) + fila)); }
+function valorCelda(hoja, col, fila){
+  const c = celdaEn(hoja, col, fila);
+  return c ? c.valor : null;
+}
+async function cargarXlsx(buffer, nombreArchivo){
+  const u8 = new Uint8Array(buffer);
+  if (u8[0] === 0xD0 && u8[1] === 0xCF)
+    throw new Error('Este archivo es un .xls antiguo. Ábrelo en Excel y guárdalo como .xlsx.');
+  if (typeof DecompressionStream === 'undefined')
+    throw new Error('Tu navegador no soporta DecompressionStream. Usa una versión reciente de Chrome, Edge o Firefox.');
+  const archivos = await descomprimirZip(buffer);
+  if (!archivos['xl/workbook.xml']) throw new Error('El archivo no contiene un libro de Excel válido.');
+  /* --- hojas y relaciones --- */
+  const wb = parsearXml(archivos['xl/workbook.xml']);
+  const rels = {};
+  if (archivos['xl/_rels/workbook.xml.rels']){
+    const rd = parsearXml(archivos['xl/_rels/workbook.xml.rels']);
+    for (const r of rd.getElementsByTagName('Relationship'))
+      rels[r.getAttribute('Id')] = r.getAttribute('Target').replace(/^\//,'').replace(/^(?!xl\/)/, 'xl/');
+  }
+  /* --- cadenas compartidas --- */
+  const sst = [];
+  if (archivos['xl/sharedStrings.xml']){
+    const sd = parsearXml(archivos['xl/sharedStrings.xml']);
+    for (const si of sd.getElementsByTagName('si')){
+      let t = '';
+      for (const tn of si.getElementsByTagName('t')) t += tn.textContent;
+      sst.push(t);
+    }
+  }
+  const nuevo = { nombreArchivo, hojas: [], celdas: new Map(), ordenTopo: [], dependientes: new Map(), avisosCarga: [] };
+  const compartidas = [];   /* fórmulas compartidas por hoja: si -> {texto, fila, col} */
+  for (const sh of wb.getElementsByTagName('sheet')){
+    const nombre = sh.getAttribute('name');
+    const rid = sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
+    const ruta = rels[rid];
+    if (!ruta || !archivos[ruta]) continue;   /* hoja de gráfico u oculta sin datos */
+    const doc = parsearXml(archivos[ruta]);
+    const hoja = { nombre, maxFila: 1, maxCol: 1 };
+    nuevo.hojas.push(hoja);
+    const maestras = {};   /* si -> {texto, fila, col} */
+    for (const fila of doc.getElementsByTagName('row')){
+      for (const c of fila.children){
+        if (c.tagName !== 'c') continue;
+        const ref = c.getAttribute('r');
+        if (!ref) continue;
+        const m = /^([A-Z]+)([0-9]+)$/.exec(ref);
+        if (!m) continue;
+        const col = colAIdx(m[1]), nFila = parseInt(m[2]);
+        const t = c.getAttribute('t') || 'n';
+        let vEl = null, fEl = null, isEl = null;
+        for (const hijo of c.children){
+          if (hijo.tagName === 'v') vEl = hijo;
+          else if (hijo.tagName === 'f') fEl = hijo;
+          else if (hijo.tagName === 'is') isEl = hijo;
+        }
+        let valor = null;
+        const vTxt = vEl ? vEl.textContent : null;
+        if (t === 's') valor = sst[parseInt(vTxt)] ?? '';
+        else if (t === 'str') valor = vTxt ?? '';
+        else if (t === 'b') valor = vTxt === '1';
+        else if (t === 'e') valor = null;
+        else if (t === 'inlineStr'){ valor = ''; if (isEl) for (const tn of isEl.getElementsByTagName('t')) valor += tn.textContent; }
+        else valor = vTxt !== null && vTxt !== '' ? parseFloat(vTxt) : null;
+        let formula = null;
+        if (fEl){
+          const tipoF = fEl.getAttribute('t');
+          if (tipoF === 'shared'){
+            const si = fEl.getAttribute('si');
+            if (fEl.textContent){ maestras[si] = { texto: fEl.textContent, fila: nFila, col }; formula = fEl.textContent; }
+            else compartidas.push({ hoja: nombre, ref, fila: nFila, col, si, maestras });
+          } else if (fEl.textContent) formula = fEl.textContent;
+        }
+        if (valor === null && formula === null) continue;
+        nuevo.celdas.set(claveDe(nombre, ref), {
+          hoja: nombre, ref, fila: nFila, col,
+          valor, valorOriginal: valor, formula,
+          ast: null, deps: [], estatica: false, motivo: ''
+        });
+        if (nFila > hoja.maxFila) hoja.maxFila = nFila;
+        if (col > hoja.maxCol) hoja.maxCol = col;
+      }
+    }
+  }
+  /* --- completar fórmulas compartidas (celdas arrastradas) --- */
+  for (const fc of compartidas){
+    const ma = fc.maestras[fc.si];
+    if (!ma) continue;
+    const c = nuevo.celdas.get(claveDe(fc.hoja, fc.ref));
+    if (c) c.formula = desplazarRefs(ma.texto, fc.fila - ma.fila, fc.col - ma.col);
+  }
+  if (!nuevo.hojas.length) throw new Error('El libro no contiene hojas de cálculo con datos.');
+  compilarLibro(nuevo);
+  return nuevo;
+}
+/* desplaza referencias relativas de una fórmula (para fórmulas compartidas) */
+function desplazarRefs(f, dF, dC){
+  let out = '', i = 0;
+  while (i < f.length){
+    const ch = f[i];
+    if (ch === '"'){
+      let j = i + 1;
+      while (j < f.length){ if (f[j] === '"' && f[j+1] === '"') j += 2; else if (f[j] === '"'){ j++; break; } else j++; }
+      out += f.slice(i, j); i = j; continue;
+    }
+    if (ch === "'"){ let j = i + 1; while (j < f.length && f[j] !== "'") j++; j++; out += f.slice(i, j); i = j; continue; }
+    const resto = f.slice(i);
+    const m = /^(\$?)([A-Z]{1,3})(\$?)([0-9]+)/.exec(resto);
+    const prev = f[i-1] || ' ', sig = f[i + (m ? m[0].length : 0)] || ' ';
+    if (m && !/[A-Za-z0-9_.$]/.test(prev) && !/[A-Za-z0-9_(]/.test(sig)){
+      let col = colAIdx(m[2]), fila = parseInt(m[4]);
+      if (!m[1]) col += dC;
+      if (!m[3]) fila += dF;
+      if (col < 1 || fila < 1){ out += m[0]; }
+      else out += m[1] + idxACol(col) + m[3] + fila;
+      i += m[0].length; continue;
+    }
+    out += ch; i++;
+  }
+  return out;
+}
+/* --- compilar fórmulas, extraer dependencias y ordenar --- */
+function compilarLibro(lb){
+  const nombresHojas = new Set(lb.hojas.map(h => h.nombre));
+  const fnsDesconocidas = new Set();
+  for (const [clave, c] of lb.celdas){
+    if (!c.formula) continue;
+    try {
+      c.ast = parsearFormula(c.formula);
+      c.deps = extraerDeps(c.ast, c.hoja, nombresHojas, lb);
+    } catch (e){
+      c.estatica = true;
+      c.motivo = e.message;
+      const fm = /Función no soportada: (\S+)/.exec(e.message);
+      if (fm) fnsDesconocidas.add(fm[1]);
+    }
+  }
+  /* grafo: aristas dep(fórmula) -> fórmula ; orden topológico (Kahn) */
+  const enGrado = new Map();
+  lb.dependientes = new Map();
+  for (const [clave, c] of lb.celdas){
+    if (!c.formula || c.estatica) continue;
+    let g = 0;
+    for (const d of c.deps){
+      const dc = lb.celdas.get(d);
+      if (dc && dc.formula && !dc.estatica) g++;
+      if (!lb.dependientes.has(d)) lb.dependientes.set(d, []);
+      lb.dependientes.get(d).push(clave);
+    }
+    enGrado.set(clave, g);
+  }
+  const cola = [];
+  for (const [k, g] of enGrado) if (g === 0) cola.push(k);
+  const orden = [];
+  while (cola.length){
+    const k = cola.shift();
+    orden.push(k);
+    for (const dep of (lb.dependientes.get(k) || [])){
+      if (!enGrado.has(dep)) continue;
+      const g = enGrado.get(dep) - 1;
+      enGrado.set(dep, g);
+      if (g === 0) cola.push(dep);
+    }
+  }
+  /* ciclos: lo que no entró en el orden queda estático */
+  let ciclos = 0;
+  for (const [k, g] of enGrado){
+    if (g > 0){
+      const c = lb.celdas.get(k);
+      c.estatica = true; c.motivo = 'Referencia circular';
+      ciclos++;
+    }
+  }
+  lb.ordenTopo = orden.filter(k => { const c = lb.celdas.get(k); return c && !c.estatica; });
+  /* avisos de carga */
+  const estaticas = [];
+  for (const [k, c] of lb.celdas) if (c.formula && c.estatica) estaticas.push(k + ' (' + c.motivo + ')');
+  if (estaticas.length){
+    const muestra = estaticas.slice(0, 8).join('; ');
+    lb.avisosCarga.push(`${estaticas.length} fórmula(s) no se pueden recalcular y usarán su último valor guardado por Excel: ${muestra}${estaticas.length > 8 ? '…' : ''}`);
+  }
+  if (fnsDesconocidas.size)
+    lb.avisosCarga.push('Funciones no soportadas encontradas: ' + [...fnsDesconocidas].join(', '));
+  if (ciclos) lb.avisosCarga.push(`${ciclos} celda(s) con referencias circulares se tratarán como valores fijos.`);
+}
+/* extrae claves de celdas de las que depende un AST */
+function extraerDeps(ast, hojaActual, nombresHojas, lb){
+  const deps = new Set();
+  (function rec(n){
+    if (!n || typeof n !== 'object') return;
+    if (n.t === 'ref'){
+      const h = n.hoja || hojaActual;
+      if (n.hoja && !nombresHojas.has(n.hoja)) throw new Error('Hoja no encontrada: ' + n.hoja);
+      deps.add(claveDe(h, idxACol(n.col) + n.fila));
+    } else if (n.t === 'range'){
+      const h = n.hoja || hojaActual;
+      if (n.hoja && !nombresHojas.has(n.hoja)) throw new Error('Hoja no encontrada: ' + n.hoja);
+      const nCeldas = (n.f2 - n.f1 + 1) * (n.c2 - n.c1 + 1);
+      if (nCeldas > 20000){
+        /* rango enorme: registrar solo las celdas existentes de la hoja dentro del rango */
+        for (const [k, c] of lb.celdas){
+          if (c.hoja === h && c.fila >= n.f1 && c.fila <= n.f2 && c.col >= n.c1 && c.col <= n.c2) deps.add(k);
+        }
+      } else {
+        for (let f = n.f1; f <= n.f2; f++)
+          for (let c = n.c1; c <= n.c2; c++) deps.add(claveDe(h, idxACol(c) + f));
+      }
+    } else if (n.t === 'bin'){ rec(n.a); rec(n.b); }
+    else if (n.t === 'un' || n.t === 'pct'){ rec(n.a); }
+    else if (n.t === 'fn'){ for (const a of n.args) rec(a); }
+  })(ast);
+  return [...deps];
+}
+/* ============================================================
+   MOTOR DE FÓRMULAS: tokenizador + parser + evaluador
+   (las fórmulas se guardan internamente en inglés y con A1)
+   ============================================================ */
+class ErrFormula extends Error {}
+const RE_REF = /^\$?([A-Z]{1,3})\$?([0-9]+)$/i;
+
+function tokenizar(src){
+  const toks = [];
+  let i = 0;
+  while (i < src.length){
+    const ch = src[i];
+    if (/\s/.test(ch)){ i++; continue; }
+    if (ch === '"'){
+      let s = ''; i++;
+      while (i < src.length){
+        if (src[i] === '"'){ if (src[i+1] === '"'){ s += '"'; i += 2; } else { i++; break; } }
+        else s += src[i++];
+      }
+      toks.push({ t:'str', v:s }); continue;
+    }
+    if (ch === "'"){
+      let s = ''; i++;
+      while (i < src.length && src[i] !== "'") s += src[i++];
+      i++;
+      toks.push({ t:'hojaq', v:s }); continue;
+    }
+    if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(src[i+1] || ''))){
+      let j = i;
+      while (j < src.length && /[0-9.]/.test(src[j])) j++;
+      if ((src[j] === 'E' || src[j] === 'e')){
+        let k = j + 1;
+        if (src[k] === '+' || src[k] === '-') k++;
+        if (/[0-9]/.test(src[k] || '')){ k++; while (k < src.length && /[0-9]/.test(src[k])) k++; j = k; }
+      }
+      toks.push({ t:'num', v: parseFloat(src.slice(i, j)) }); i = j; continue;
+    }
+    if (/[A-Za-z_$À-ɏ]/.test(ch)){
+      let j = i;
+      while (j < src.length && /[A-Za-z0-9_.$À-ɏ]/.test(src[j])) j++;
+      toks.push({ t:'id', v: src.slice(i, j) }); i = j; continue;
+    }
+    const dos = src.substr(i, 2);
+    if (dos === '<=' || dos === '>=' || dos === '<>'){ toks.push({ t:'op', v:dos }); i += 2; continue; }
+    if ('+-*/^&%(),:;!=<>{}'.includes(ch)){ toks.push({ t:'op', v:ch }); i++; continue; }
+    throw new ErrFormula('Carácter no reconocido en fórmula: ' + ch);
+  }
+  return toks;
+}
+function parsearFormula(texto){
+  const toks = tokenizar(texto.replace(/^=/, ''));
+  let pos = 0;
+  const ver = () => toks[pos] || null;
+  const esOp = v => { const t = ver(); return t && t.t === 'op' && t.v === v; };
+  const tomar = () => toks[pos++];
+  const exigir = v => { if (!esOp(v)) throw new ErrFormula('Se esperaba "' + v + '"'); pos++; };
+
+  function expr(){                       /* comparaciones */
+    let a = concat();
+    while (ver() && ver().t === 'op' && ['=','<','>','<=','>=','<>'].includes(ver().v)){
+      const op = tomar().v;
+      a = { t:'bin', op, a, b: concat() };
+    }
+    return a;
+  }
+  function concat(){
+    let a = adit();
+    while (esOp('&')){ tomar(); a = { t:'bin', op:'&', a, b: adit() }; }
+    return a;
+  }
+  function adit(){
+    let a = mult();
+    while (ver() && ver().t === 'op' && (ver().v === '+' || ver().v === '-')){
+      const op = tomar().v;
+      a = { t:'bin', op, a, b: mult() };
+    }
+    return a;
+  }
+  function mult(){
+    let a = pot();
+    while (ver() && ver().t === 'op' && (ver().v === '*' || ver().v === '/')){
+      const op = tomar().v;
+      a = { t:'bin', op, a, b: pot() };
+    }
+    return a;
+  }
+  function pot(){
+    let a = unario();
+    while (esOp('^')){ tomar(); a = { t:'bin', op:'^', a, b: unario() }; }
+    return a;
+  }
+  function unario(){
+    if (ver() && ver().t === 'op' && (ver().v === '-' || ver().v === '+')){
+      const op = tomar().v;
+      const a = unario();
+      return op === '-' ? { t:'un', op:'-', a } : a;
+    }
+    return posfijo();
+  }
+  function posfijo(){
+    let a = primario();
+    while (esOp('%')){ tomar(); a = { t:'pct', a }; }
+    return a;
+  }
+  function refDesdeId(id){
+    const m = RE_REF.exec(id);
+    if (!m) return null;
+    return { col: colAIdx(m[1]), fila: parseInt(m[2]) };
+  }
+  function refORango(hoja){
+    const t = tomar();
+    if (!t || t.t !== 'id') throw new ErrFormula('Referencia no válida tras el nombre de hoja');
+    const r1 = refDesdeId(t.v);
+    if (!r1) throw new ErrFormula('Referencia no válida: ' + t.v);
+    if (esOp(':')){
+      tomar();
+      const t2 = tomar();
+      const r2 = t2 && t2.t === 'id' ? refDesdeId(t2.v) : null;
+      if (!r2) throw new ErrFormula('Rango no válido');
+      return { t:'range', hoja,
+        f1: Math.min(r1.fila, r2.fila), f2: Math.max(r1.fila, r2.fila),
+        c1: Math.min(r1.col, r2.col),  c2: Math.max(r1.col, r2.col) };
+    }
+    return { t:'ref', hoja, col: r1.col, fila: r1.fila };
+  }
+  function primario(){
+    const t = ver();
+    if (!t) throw new ErrFormula('Fórmula incompleta');
+    if (t.t === 'num'){ tomar(); return { t:'num', v: t.v }; }
+    if (t.t === 'str'){ tomar(); return { t:'str', v: t.v }; }
+    if (t.t === 'hojaq'){                     /* 'Nombre de hoja'!A1 */
+      tomar(); exigir('!');
+      return refORango(t.v);
+    }
+    if (t.t === 'op' && t.v === '('){
+      tomar();
+      const e = expr();
+      exigir(')');
+      return e;
+    }
+    if (t.t === 'op' && t.v === '{')
+      throw new ErrFormula('Constantes de matriz {…} no soportadas');
+    if (t.t === 'id'){
+      tomar();
+      /* ¿función? */
+      if (esOp('(')){
+        tomar();
+        const args = [];
+        if (!esOp(')')){
+          for (;;){
+            if (esOp(',') || esOp(';')){ args.push(null); tomar(); continue; }
+            args.push(expr());
+            if (esOp(',') || esOp(';')){ tomar(); if (esOp(')')){ args.push(null); } continue; }
+            break;
+          }
+        }
+        exigir(')');
+        return { t:'fn', nombre: t.v.toUpperCase(), args };
+      }
+      /* ¿prefijo de hoja sin comillas?  Hoja1!A1 */
+      if (esOp('!')){ tomar(); return refORango(t.v); }
+      /* ¿referencia o rango? */
+      const r1 = refDesdeId(t.v);
+      if (r1){
+        if (esOp(':')){
+          tomar();
+          const t2 = tomar();
+          const r2 = t2 && t2.t === 'id' ? refDesdeId(t2.v) : null;
+          if (!r2) throw new ErrFormula('Rangos de columna/fila completa no soportados');
+          return { t:'range', hoja: null,
+            f1: Math.min(r1.fila, r2.fila), f2: Math.max(r1.fila, r2.fila),
+            c1: Math.min(r1.col, r2.col),  c2: Math.max(r1.col, r2.col) };
+        }
+        return { t:'ref', hoja: null, col: r1.col, fila: r1.fila };
+      }
+      const up = t.v.toUpperCase();
+      if (up === 'TRUE' || up === 'VERDADERO') return { t:'bool', v: true };
+      if (up === 'FALSE' || up === 'FALSO') return { t:'bool', v: false };
+      throw new ErrFormula('Nombre no soportado: ' + t.v);
+    }
+    throw new ErrFormula('Símbolo inesperado: ' + (t.v ?? t.t));
+  }
+  const arbol = expr();
+  if (pos < toks.length) throw new ErrFormula('Fórmula con símbolos sobrantes');
+  return arbol;
+}
+/* ---------- evaluación ---------- */
+function aNum(x){
+  if (x === null || x === undefined) return 0;
+  if (typeof x === 'number'){ if (!isFinite(x)) throw new ErrFormula('#NUM!'); return x; }
+  if (typeof x === 'boolean') return x ? 1 : 0;
+  if (typeof x === 'string'){
+    if (x.trim() === '') return 0;
+    const n = parseFloat(x);
+    if (isFinite(n)) return n;
+    throw new ErrFormula('#VALOR!');
+  }
+  throw new ErrFormula('#VALOR!');
+}
+function crearRango(hoja, n){
+  return {
+    esRango: true,
+    filas: n.f2 - n.f1 + 1, cols: n.c2 - n.c1 + 1,
+    get(i, j){ return valorCelda(hoja, n.c1 + j, n.f1 + i); },
+    porCada(cb){
+      for (let f = n.f1; f <= n.f2; f++)
+        for (let c = n.c1; c <= n.c2; c++) cb(valorCelda(hoja, c, f));
+    }
+  };
+}
+function evaluar(n, hoja){
+  switch (n.t){
+    case 'num': case 'str': case 'bool': return n.v;
+    case 'ref': return valorCelda(n.hoja || hoja, n.col, n.fila);
+    case 'range': return crearRango(n.hoja || hoja, n);
+    case 'un': return -aNum(evaluar(n.a, hoja));
+    case 'pct': return aNum(evaluar(n.a, hoja)) / 100;
+    case 'bin': {
+      const op = n.op;
+      if (op === '&'){
+        const a = evaluar(n.a, hoja), b = evaluar(n.b, hoja);
+        const txt = x => x === null || x === undefined ? '' : typeof x === 'boolean' ? (x?'VERDADERO':'FALSO') : String(x);
+        return txt(a) + txt(b);
+      }
+      if (['=','<','>','<=','>=','<>'].includes(op)){
+        let a = evaluar(n.a, hoja), b = evaluar(n.b, hoja);
+        if (typeof a === 'string' && typeof b === 'string'){ a = a.toLowerCase(); b = b.toLowerCase(); }
+        else { try { a = aNum(a); b = aNum(b); } catch(e){ a = String(a); b = String(b); } }
+        switch (op){
+          case '=': return a === b;   case '<>': return a !== b;
+          case '<': return a < b;     case '>': return a > b;
+          case '<=': return a <= b;   case '>=': return a >= b;
+        }
+      }
+      const a = aNum(evaluar(n.a, hoja)), b = aNum(evaluar(n.b, hoja));
+      switch (op){
+        case '+': return a + b;  case '-': return a - b;
+        case '*': return a * b;
+        case '/': if (b === 0) throw new ErrFormula('#DIV/0!'); return a / b;
+        case '^': return Math.pow(a, b);
+      }
+      throw new ErrFormula('Operador no soportado: ' + op);
+    }
+    case 'fn': return llamarFn(n.nombre, n.args, hoja);
+  }
+  throw new ErrFormula('Nodo desconocido');
+}
+/* ---------- funciones de hoja de cálculo ---------- */
+function numsDe(vals){
+  const out = [];
+  for (const v of vals){
+    if (v === null || v === undefined) continue;
+    if (v && v.esRango) v.porCada(x => { if (typeof x === 'number' && isFinite(x)) out.push(x); });
+    else if (typeof v === 'number'){ if (isFinite(v)) out.push(v); }
+    else if (typeof v === 'boolean') out.push(v ? 1 : 0);
+    else { const p = parseFloat(v); if (isFinite(p)) out.push(p); }
+  }
+  return out;
+}
+function criterioA(criterio){
+  if (typeof criterio === 'number' || typeof criterio === 'boolean') return x => x === criterio || aNumSeguro(x) === aNum(criterio);
+  const s = String(criterio ?? '');
+  const m = /^(<=|>=|<>|<|>|=)?(.*)$/.exec(s);
+  const op = m[1] || '=';
+  const resto = m[2];
+  const nRes = parseFloat(resto);
+  const esNum = resto.trim() !== '' && isFinite(nRes);
+  return x => {
+    if (esNum){
+      const nx = aNumSeguro(x);
+      if (nx === null) return false;
+      switch (op){
+        case '=': return nx === nRes;  case '<>': return nx !== nRes;
+        case '<': return nx < nRes;    case '>': return nx > nRes;
+        case '<=': return nx <= nRes;  case '>=': return nx >= nRes;
+      }
+    }
+    const sx = String(x ?? '').toLowerCase(), sr = resto.toLowerCase();
+    return op === '<>' ? sx !== sr : sx === sr;
+  };
+}
+function aNumSeguro(x){
+  if (typeof x === 'number') return isFinite(x) ? x : null;
+  if (typeof x === 'boolean') return x ? 1 : 0;
+  if (typeof x === 'string' && x.trim() !== ''){ const n = parseFloat(x); return isFinite(n) ? n : null; }
+  return null;
+}
+function exigirRango(v, fn){ if (!v || !v.esRango) throw new ErrFormula(fn + ' requiere un rango'); return v; }
+const FNS = {};
+function defFn(nombres, fn, lazy){
+  for (const n of nombres.split(' ')) FNS[n] = { fn, lazy: !!lazy };
+}
+defFn('SUM SUMA', a => numsDe(a).reduce((s,v)=>s+v,0));
+defFn('PRODUCT PRODUCTO', a => numsDe(a).reduce((s,v)=>s*v,1));
+defFn('AVERAGE PROMEDIO', a => { const n = numsDe(a); if(!n.length) throw new ErrFormula('#DIV/0!'); return n.reduce((s,v)=>s+v,0)/n.length; });
+defFn('MEDIAN MEDIANA', a => { const n = numsDe(a).sort((x,y)=>x-y); if(!n.length) throw new ErrFormula('#NUM!'); const m=n.length>>1; return n.length%2?n[m]:(n[m-1]+n[m])/2; });
+defFn('MIN', a => { const n = numsDe(a); return n.length ? Math.min(...n) : 0; });
+defFn('MAX', a => { const n = numsDe(a); return n.length ? Math.max(...n) : 0; });
+defFn('COUNT CONTAR', a => numsDe(a).length);
+defFn('COUNTA CONTARA', a => { let c=0; for (const v of a){ if (v===null||v===undefined) continue; if (v.esRango) v.porCada(x=>{ if(x!==null&&x!==undefined&&x!=='') c++; }); else c++; } return c; });
+defFn('ABS', a => Math.abs(aNum(a[0])));
+defFn('SQRT RAIZ', a => { const v = aNum(a[0]); if (v<0) throw new ErrFormula('#NUM!'); return Math.sqrt(v); });
+defFn('EXP', a => Math.exp(aNum(a[0])));
+defFn('LN', a => { const v=aNum(a[0]); if(v<=0) throw new ErrFormula('#NUM!'); return Math.log(v); });
+defFn('LOG', a => { const v=aNum(a[0]); const b = a[1]===null||a[1]===undefined ? 10 : aNum(a[1]); if(v<=0||b<=0) throw new ErrFormula('#NUM!'); return Math.log(v)/Math.log(b); });
+defFn('LOG10', a => { const v=aNum(a[0]); if(v<=0) throw new ErrFormula('#NUM!'); return Math.log10(v); });
+defFn('POWER POTENCIA', a => Math.pow(aNum(a[0]), aNum(a[1])));
+defFn('MOD RESIDUO', a => { const x=aNum(a[0]), y=aNum(a[1]); if(y===0) throw new ErrFormula('#DIV/0!'); return x - y*Math.floor(x/y); });
+defFn('INT ENTERO', a => Math.floor(aNum(a[0])));
+defFn('TRUNC TRUNCAR', a => Math.trunc(aNum(a[0]) * Math.pow(10, a[1]?aNum(a[1]):0)) / Math.pow(10, a[1]?aNum(a[1]):0));
+defFn('SIGN SIGNO', a => Math.sign(aNum(a[0])));
+defFn('PI', () => Math.PI);
+defFn('ROUND REDONDEAR', a => { const f = Math.pow(10, a[1]!==null&&a[1]!==undefined?aNum(a[1]):0); return Math.round((aNum(a[0])+Number.EPSILON) * f) / f; });
+defFn('ROUNDUP REDONDEAR.MAS', a => { const f = Math.pow(10, a[1]!==null&&a[1]!==undefined?aNum(a[1]):0); const v=aNum(a[0]); return Math.sign(v)*Math.ceil(Math.abs(v)*f)/f; });
+defFn('ROUNDDOWN REDONDEAR.MENOS', a => { const f = Math.pow(10, a[1]!==null&&a[1]!==undefined?aNum(a[1]):0); const v=aNum(a[0]); return Math.sign(v)*Math.floor(Math.abs(v)*f)/f; });
+defFn('CEILING MULTIPLO.SUPERIOR CEILING.MATH', a => { const v=aNum(a[0]); const s=a[1]?aNum(a[1]):1; return s===0?0:Math.ceil(v/s)*s; });
+defFn('FLOOR MULTIPLO.INFERIOR FLOOR.MATH', a => { const v=aNum(a[0]); const s=a[1]?aNum(a[1]):1; return s===0?0:Math.floor(v/s)*s; });
+defFn('STDEV STDEV.S DESVEST DESVEST.M', a => { const n=numsDe(a); if(n.length<2) throw new ErrFormula('#DIV/0!'); const m=n.reduce((s,v)=>s+v,0)/n.length; return Math.sqrt(n.reduce((s,v)=>s+(v-m)*(v-m),0)/(n.length-1)); });
+defFn('STDEVP STDEV.P DESVESTP DESVEST.P', a => { const n=numsDe(a); if(!n.length) throw new ErrFormula('#DIV/0!'); const m=n.reduce((s,v)=>s+v,0)/n.length; return Math.sqrt(n.reduce((s,v)=>s+(v-m)*(v-m),0)/n.length); });
+defFn('VAR VAR.S', a => { const n=numsDe(a); if(n.length<2) throw new ErrFormula('#DIV/0!'); const m=n.reduce((s,v)=>s+v,0)/n.length; return n.reduce((s,v)=>s+(v-m)*(v-m),0)/(n.length-1); });
+defFn('VARP VAR.P', a => { const n=numsDe(a); if(!n.length) throw new ErrFormula('#DIV/0!'); const m=n.reduce((s,v)=>s+v,0)/n.length; return n.reduce((s,v)=>s+(v-m)*(v-m),0)/n.length; });
+defFn('LARGE K.ESIMO.MAYOR', a => { const n=numsDe([a[0]]).sort((x,y)=>y-x); const k=aNum(a[1]); if(k<1||k>n.length) throw new ErrFormula('#NUM!'); return n[k-1]; });
+defFn('SMALL K.ESIMO.MENOR', a => { const n=numsDe([a[0]]).sort((x,y)=>x-y); const k=aNum(a[1]); if(k<1||k>n.length) throw new ErrFormula('#NUM!'); return n[k-1]; });
+defFn('SUMSQ SUMA.CUADRADOS', a => numsDe(a).reduce((s,v)=>s+v*v,0));
+defFn('SUMPRODUCT SUMAPRODUCTO', a => {
+  const rangos = a.filter(v=>v&&v.esRango);
+  if (!rangos.length) return numsDe(a).reduce((s,v)=>s*v,1);
+  const filas = rangos[0].filas, cols = rangos[0].cols;
+  for (const r of rangos) if (r.filas!==filas||r.cols!==cols) throw new ErrFormula('#VALOR!');
+  let s = 0;
+  for (let i=0;i<filas;i++) for (let j=0;j<cols;j++){
+    let p = 1;
+    for (const r of rangos){ const v = aNumSeguro(r.get(i,j)); p *= v===null?0:v; }
+    s += p;
+  }
+  return s;
+});
+defFn('COUNTIF CONTAR.SI', a => { const r = exigirRango(a[0],'COUNTIF'); const test = criterioA(a[1]); let c=0; r.porCada(x=>{ if(test(x)) c++; }); return c; });
+defFn('SUMIF SUMAR.SI', a => {
+  const r = exigirRango(a[0],'SUMIF'); const test = criterioA(a[1]);
+  const rs = a[2] && a[2].esRango ? a[2] : r;
+  let s = 0, i = 0;
+  const planos = [], planosSuma = [];
+  r.porCada(x=>planos.push(x)); rs.porCada(x=>planosSuma.push(x));
+  for (i=0;i<planos.length;i++){ if (test(planos[i])){ const v = aNumSeguro(planosSuma[i]); if (v!==null) s += v; } }
+  return s;
+});
+defFn('IF SI', (args, hoja) => {
+  const cond = evaluar(args[0], hoja);
+  let c;
+  if (typeof cond === 'boolean') c = cond;
+  else if (typeof cond === 'number') c = cond !== 0;
+  else if (cond === null || cond === undefined) c = false;
+  else c = String(cond).toLowerCase() === 'true' || String(cond).toLowerCase() === 'verdadero';
+  if (c) return args[1] !== null && args[1] !== undefined ? evaluar(args[1], hoja) : true;
+  return args[2] !== null && args[2] !== undefined ? evaluar(args[2], hoja) : false;
+}, true);
+defFn('IFERROR SI.ERROR', (args, hoja) => {
+  try { const v = evaluar(args[0], hoja); return v === null ? 0 : v; }
+  catch(e){ return args[1] !== null && args[1] !== undefined ? evaluar(args[1], hoja) : 0; }
+}, true);
+defFn('AND Y', a => { for (const v of a){ if (v===null||v===undefined) continue; if (v.esRango){ let ok=true; v.porCada(x=>{ if(typeof x==='boolean'&&!x) ok=false; if(typeof x==='number'&&x===0) ok=false; }); if(!ok) return false; } else if (!(typeof v==='boolean'?v:aNum(v)!==0)) return false; } return true; });
+defFn('OR O', a => { for (const v of a){ if (v===null||v===undefined) continue; if (v.esRango){ let ok=false; v.porCada(x=>{ if(typeof x==='boolean'&&x) ok=true; if(typeof x==='number'&&x!==0) ok=true; }); if(ok) return true; } else if (typeof v==='boolean'?v:aNum(v)!==0) return true; } return false; });
+defFn('NOT NO', a => !(typeof a[0]==='boolean' ? a[0] : aNum(a[0]) !== 0));
+defFn('ISNUMBER ESNUMERO', a => typeof a[0] === 'number');
+defFn('ISBLANK ESBLANCO', a => a[0] === null || a[0] === undefined);
+defFn('VLOOKUP BUSCARV CONSULTAV', a => {
+  const val = a[0], r = exigirRango(a[1],'VLOOKUP');
+  const colIdx = Math.round(aNum(a[2]));
+  const exacto = a[3] !== null && a[3] !== undefined ? !(typeof a[3]==='boolean'?a[3]:aNum(a[3])!==0) : false;
+  if (colIdx < 1 || colIdx > r.cols) throw new ErrFormula('#REF!');
+  const nv = aNumSeguro(val);
+  let mejor = null;
+  for (let i=0;i<r.filas;i++){
+    const cl = r.get(i, 0);
+    if (exacto){
+      if (cl === val || (nv !== null && aNumSeguro(cl) === nv) ||
+          (typeof cl === 'string' && typeof val === 'string' && cl.toLowerCase() === val.toLowerCase()))
+        return r.get(i, colIdx-1);
+    } else {
+      const ncl = aNumSeguro(cl);
+      if (nv !== null && ncl !== null && ncl <= nv) mejor = r.get(i, colIdx-1);
+    }
+  }
+  if (!exacto && mejor !== null) return mejor;
+  throw new ErrFormula('#N/A');
+});
+defFn('INDEX INDICE', a => {
+  const r = exigirRango(a[0],'INDEX');
+  const f = a[1] !== null && a[1] !== undefined ? Math.round(aNum(a[1])) : 1;
+  const c = a[2] !== null && a[2] !== undefined ? Math.round(aNum(a[2])) : 1;
+  if (f < 1 || f > r.filas || c < 1 || c > r.cols) throw new ErrFormula('#REF!');
+  return r.get(f-1, c-1);
+});
+defFn('MATCH COINCIDIR', a => {
+  const val = a[0], r = exigirRango(a[1],'MATCH');
+  const tipo = a[2] !== null && a[2] !== undefined ? Math.round(aNum(a[2])) : 1;
+  const planos = [];
+  r.porCada(x=>planos.push(x));
+  const nv = aNumSeguro(val);
+  if (tipo === 0){
+    for (let i=0;i<planos.length;i++){
+      const x = planos[i];
+      if (x === val || (nv!==null && aNumSeguro(x)===nv) ||
+          (typeof x==='string'&&typeof val==='string'&&x.toLowerCase()===val.toLowerCase())) return i+1;
+    }
+    throw new ErrFormula('#N/A');
+  }
+  let mejor = -1;
+  for (let i=0;i<planos.length;i++){
+    const nx = aNumSeguro(planos[i]);
+    if (nx === null || nv === null) continue;
+    if (tipo === 1 && nx <= nv) mejor = i;
+    if (tipo === -1 && nx >= nv) mejor = i;
+  }
+  if (mejor < 0) throw new ErrFormula('#N/A');
+  return mejor + 1;
+});
+defFn('NPV VNA', a => {
+  const tasa = aNum(a[0]);
+  const flujos = numsDe(a.slice(1));
+  let s = 0;
+  for (let i=0;i<flujos.length;i++) s += flujos[i] / Math.pow(1+tasa, i+1);
+  return s;
+});
+defFn('IRR TIR', a => {
+  const flujos = numsDe([a[0]]);
+  if (flujos.length < 2) throw new ErrFormula('#NUM!');
+  const vna = r => flujos.reduce((s,f,i)=>s+f/Math.pow(1+r,i),0);
+  let lo = -0.9999, hi = 10;
+  let flo = vna(lo), fhi = vna(hi);
+  if (flo * fhi > 0) throw new ErrFormula('#NUM!');
+  for (let k=0;k<200;k++){
+    const mid = (lo+hi)/2, fm = vna(mid);
+    if (Math.abs(fm) < 1e-9) return mid;
+    if (flo * fm < 0){ hi = mid; fhi = fm; } else { lo = mid; flo = fm; }
+  }
+  return (lo+hi)/2;
+});
+defFn('PMT PAGO', a => {
+  const r = aNum(a[0]), n = aNum(a[1]), pv = aNum(a[2]);
+  const fv = a[3] ? aNum(a[3]) : 0, tipo = a[4] ? aNum(a[4]) : 0;
+  if (r === 0) return -(pv + fv) / n;
+  const f = Math.pow(1+r, n);
+  return -(pv * f + fv) * r / ((f - 1) * (1 + r * tipo));
+});
+defFn('FV VF', a => {
+  const r = aNum(a[0]), n = aNum(a[1]), pago = aNum(a[2]);
+  const pv = a[3] ? aNum(a[3]) : 0, tipo = a[4] ? aNum(a[4]) : 0;
+  const f = Math.pow(1+r, n);
+  if (r === 0) return -(pv + pago * n);
+  return -(pv * f + pago * (1 + r * tipo) * (f - 1) / r);
+});
+defFn('PV VA', a => {
+  const r = aNum(a[0]), n = aNum(a[1]), pago = aNum(a[2]);
+  const fv = a[3] ? aNum(a[3]) : 0, tipo = a[4] ? aNum(a[4]) : 0;
+  const f = Math.pow(1+r, n);
+  if (r === 0) return -(fv + pago * n);
+  return -(fv + pago * (1 + r * tipo) * (f - 1) / r) / f;
+});
+defFn('CONCATENATE CONCATENAR CONCAT', a => a.map(v => v===null||v===undefined?'':typeof v==='boolean'?(v?'VERDADERO':'FALSO'):String(v)).join(''));
+function llamarFn(nombre, args, hoja){
+  const f = FNS[nombre];
+  if (!f) throw new ErrFormula('Función no soportada: ' + nombre);
+  if (f.lazy) return f.fn(args, hoja);
+  return f.fn(args.map(x => x === null ? null : evaluar(x, hoja)), hoja);
+}
+/* ============================================================
+   DISTRIBUCIONES DE ENTRADA
+   ============================================================ */
+const DISTS = {
+  normal: {
+    nombre: 'Normal',
+    campos: [['media','Media'],['sd','Desv. estándar']],
+    porDefecto: v => ({ media: v, sd: Math.abs(v) * 0.1 || 1 }),
+    validar: p => !isFinite(p.media) ? 'Indica la media.' : !isFinite(p.sd) || p.sd <= 0 ? 'La desviación debe ser > 0.' : null,
+    muestra: (p, rng) => p.media + p.sd * randNormal(rng),
+    mediaT: p => p.media, sdT: p => p.sd,
+    rango: p => [p.media - 3.5*p.sd, p.media + 3.5*p.sd],
+    pdf: (p, x) => Math.exp(-0.5*Math.pow((x-p.media)/p.sd,2))/(p.sd*Math.sqrt(2*Math.PI)),
+    resumen: p => `μ=${fmtNum(p.media)} σ=${fmtNum(p.sd)}`
+  },
+  triangular: {
+    nombre: 'Triangular',
+    campos: [['min','Mínimo'],['moda','Más probable'],['max','Máximo']],
+    porDefecto: v => { const a = Math.min(v*0.9, v*1.1), b = Math.max(v*0.9, v*1.1); return { min: a===b?v-1:a, moda: v, max: a===b?v+1:b }; },
+    validar: p => !isFinite(p.min)||!isFinite(p.moda)||!isFinite(p.max) ? 'Completa mínimo, más probable y máximo.'
+      : !(p.min <= p.moda && p.moda <= p.max && p.min < p.max) ? 'Se requiere mínimo ≤ más probable ≤ máximo (y mínimo < máximo).' : null,
+    muestra: (p, rng) => randTriangular(p.min, p.moda, p.max, rng),
+    mediaT: p => (p.min+p.moda+p.max)/3,
+    sdT: p => Math.sqrt((p.min*p.min+p.moda*p.moda+p.max*p.max-p.min*p.moda-p.min*p.max-p.moda*p.max)/18),
+    rango: p => [p.min, p.max],
+    pdf: (p, x) => x < p.min || x > p.max ? 0 : x < p.moda
+      ? 2*(x-p.min)/((p.max-p.min)*(p.moda-p.min)||1e-12)
+      : 2*(p.max-x)/((p.max-p.min)*(p.max-p.moda)||1e-12),
+    resumen: p => `${fmtNum(p.min)} / ${fmtNum(p.moda)} / ${fmtNum(p.max)}`
+  },
+  uniforme: {
+    nombre: 'Uniforme',
+    campos: [['min','Mínimo'],['max','Máximo']],
+    porDefecto: v => { const a = Math.min(v*0.9, v*1.1), b = Math.max(v*0.9, v*1.1); return { min: a===b?v-1:a, max: a===b?v+1:b }; },
+    validar: p => !isFinite(p.min)||!isFinite(p.max) ? 'Completa mínimo y máximo.' : p.min >= p.max ? 'El mínimo debe ser menor que el máximo.' : null,
+    muestra: (p, rng) => p.min + (p.max - p.min) * rng(),
+    mediaT: p => (p.min+p.max)/2, sdT: p => (p.max-p.min)/Math.sqrt(12),
+    rango: p => [p.min, p.max],
+    pdf: (p, x) => x < p.min || x > p.max ? 0 : 1/(p.max-p.min),
+    resumen: p => `${fmtNum(p.min)} … ${fmtNum(p.max)}`
+  },
+  lognormal: {
+    nombre: 'Lognormal',
+    campos: [['media','Media'],['sd','Desv. estándar']],
+    porDefecto: v => ({ media: v > 0 ? v : 1, sd: (v > 0 ? v : 1) * 0.15 }),
+    validar: p => !isFinite(p.media) || p.media <= 0 ? 'La media debe ser > 0.' : !isFinite(p.sd) || p.sd <= 0 ? 'La desviación debe ser > 0.' : null,
+    muestra: (p, rng) => randLognormal(p.media, p.sd, rng),
+    mediaT: p => p.media, sdT: p => p.sd,
+    rango: p => [0, p.media + 4*p.sd],
+    pdf: (p, x) => {
+      if (x <= 0) return 0;
+      const s2 = Math.log(1+(p.sd*p.sd)/(p.media*p.media));
+      const mu = Math.log(p.media) - s2/2;
+      return Math.exp(-Math.pow(Math.log(x)-mu,2)/(2*s2))/(x*Math.sqrt(2*Math.PI*s2));
+    },
+    resumen: p => `μ=${fmtNum(p.media)} σ=${fmtNum(p.sd)}`
+  },
+  pert: {
+    nombre: 'PERT (Beta)',
+    campos: [['min','Mínimo'],['moda','Más probable'],['max','Máximo']],
+    porDefecto: v => { const a = Math.min(v*0.85, v*1.15), b = Math.max(v*0.85, v*1.15); return { min: a===b?v-1:a, moda: v, max: a===b?v+1:b }; },
+    validar: p => !isFinite(p.min)||!isFinite(p.moda)||!isFinite(p.max) ? 'Completa mínimo, más probable y máximo.'
+      : !(p.min <= p.moda && p.moda <= p.max && p.min < p.max) ? 'Se requiere mínimo ≤ más probable ≤ máximo (y mínimo < máximo).' : null,
+    muestra: (p, rng) => {
+      const al = 1 + 4*(p.moda-p.min)/(p.max-p.min), be = 1 + 4*(p.max-p.moda)/(p.max-p.min);
+      return p.min + (p.max - p.min) * randBeta(al, be, rng);
+    },
+    mediaT: p => (p.min + 4*p.moda + p.max)/6, sdT: p => (p.max - p.min)/6,
+    rango: p => [p.min, p.max],
+    pdf: (p, x) => {
+      if (x <= p.min || x >= p.max) return 0;
+      const al = 1 + 4*(p.moda-p.min)/(p.max-p.min), be = 1 + 4*(p.max-p.moda)/(p.max-p.min);
+      const z = (x - p.min)/(p.max - p.min);
+      const lnB = logGamma(al) + logGamma(be) - logGamma(al+be);
+      return Math.exp((al-1)*Math.log(z) + (be-1)*Math.log(1-z) - lnB) / (p.max - p.min);
+    },
+    resumen: p => `${fmtNum(p.min)} / ${fmtNum(p.moda)} / ${fmtNum(p.max)}`
+  },
+  exponencial: {
+    nombre: 'Exponencial',
+    campos: [['media','Media (1/λ)']],
+    porDefecto: v => ({ media: v > 0 ? v : 1 }),
+    validar: p => !isFinite(p.media) || p.media <= 0 ? 'La media debe ser > 0.' : null,
+    muestra: (p, rng) => -p.media * Math.log(1 - rng()),
+    mediaT: p => p.media, sdT: p => p.media,
+    rango: p => [0, p.media * 5],
+    pdf: (p, x) => x < 0 ? 0 : Math.exp(-x/p.media)/p.media,
+    resumen: p => `media=${fmtNum(p.media)}`
+  }
+};
+/* ============================================================
+   ESTADO DE LA APLICACIÓN
+   ============================================================ */
+const $ = id => document.getElementById(id);
+let entradas = [];        /* [{clave, hoja, ref, nombre, dist, params}] */
+let salidas = [];         /* [{clave, hoja, ref, nombre}] */
+let hojaActiva = 0;
+let seleccion = null;     /* {hoja, ref, col, fila} */
+let ultimo = null;        /* resultados de la última simulación */
+let simulando = false;
+const LIM_FILAS = 300, LIM_COLS = 40;
+
+function limpiarAlertas(){ $('alertas').innerHTML = ''; }
+function mostrarAlertas(lista, tipo){
+  $('alertas').innerHTML += lista.map(m => `<div class="alerta ${tipo}">${m}</div>`).join('');
+}
+function progreso(visible, frac, texto){
+  $('cajaProgreso').style.display = visible ? '' : 'none';
+  $('textoProgreso').style.display = visible ? '' : 'none';
+  if (visible){
+    $('barraProgreso').style.width = (frac*100).toFixed(1) + '%';
+    $('textoProgreso').textContent = texto || `Simulando… ${(frac*100).toFixed(0)} %`;
+  }
+}
+/* ============================================================
+   CARGA DE ARCHIVO
+   ============================================================ */
+const zona = $('zonaCarga');
+zona.addEventListener('click', () => $('inputArchivo').click());
+zona.addEventListener('dragover', e => { e.preventDefault(); zona.classList.add('arrastre'); });
+zona.addEventListener('dragleave', () => zona.classList.remove('arrastre'));
+zona.addEventListener('drop', e => {
+  e.preventDefault(); zona.classList.remove('arrastre');
+  const f = e.dataTransfer.files[0];
+  if (f) procesarArchivo(f);
+});
+$('inputArchivo').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (f) procesarArchivo(f);
+  e.target.value = '';
+});
+async function procesarArchivo(f){
+  limpiarAlertas();
+  if (!/\.xlsx$/i.test(f.name)){
+    mostrarAlertasCarga(['Solo se admiten archivos .xlsx. ' + (/\.xls$/i.test(f.name) ? 'Tu archivo es .xls antiguo: ábrelo en Excel y guárdalo como .xlsx.' : '')], 'error');
+    return;
+  }
+  try {
+    const buffer = await f.arrayBuffer();
+    const lb = await cargarXlsx(buffer, f.name);
+    iniciarLibro(lb);
+  } catch (e){
+    mostrarAlertasCarga(['No se pudo leer el archivo: ' + escapeHtml(e.message)], 'error');
+  }
+}
+function mostrarAlertasCarga(lista, tipo){
+  /* en pantalla de carga las alertas van dentro de esa tarjeta */
+  let cont = document.querySelector('#pantallaCarga .tarjeta');
+  const div = document.createElement('div');
+  div.innerHTML = lista.map(m => `<div class="alerta ${tipo}" style="margin-top:10px">${m}</div>`).join('');
+  cont.appendChild(div);
+  setTimeout(() => div.remove(), 9000);
+}
+function iniciarLibro(lb){
+  libro = lb;
+  entradas = []; salidas = []; seleccion = null; ultimo = null; hojaActiva = 0;
+  $('pantallaCarga').style.display = 'none';
+  $('app').style.display = '';
+  $('nombreArchivo').textContent = '📄 ' + lb.nombreArchivo;
+  $('btnCSV').disabled = true; $('btnInforme').disabled = true;
+  $('panelResultados').innerHTML = '';
+  limpiarAlertas();
+  if (lb.avisosCarga.length) mostrarAlertas(lb.avisosCarga.map(escapeHtml), 'aviso');
+  const nForms = lb.ordenTopo.length;
+  mostrarAlertas([`Libro cargado: ${lb.hojas.length} hoja(s), ${lb.celdas.size} celdas con datos, ${nForms} fórmulas recalculables. ` +
+    `Haz clic en una celda para definirla como <b>entrada</b> o <b>salida</b>.`], 'info');
+  renderPestanas();
+  renderRejilla();
+  renderSeleccion();
+  renderListas();
+}
+$('btnQuitarArchivo').addEventListener('click', () => {
+  if (simulando) return;
+  libro = null; entradas = []; salidas = []; ultimo = null;
+  $('app').style.display = 'none';
+  $('pantallaCarga').style.display = '';
+  $('panelResultados').innerHTML = '';
+});
+/* ============================================================
+   REJILLA
+   ============================================================ */
+function renderPestanas(){
+  $('pestanasHojas').innerHTML = libro.hojas.map((h, i) =>
+    `<button class="${i === hojaActiva ? 'activa' : ''}" data-hoja="${i}">${escapeHtml(h.nombre)}</button>`).join('');
+}
+$('pestanasHojas').addEventListener('click', e => {
+  const b = e.target.closest('button[data-hoja]');
+  if (!b) return;
+  hojaActiva = parseInt(b.dataset.hoja);
+  renderPestanas(); renderRejilla();
+});
+function formatoCelda(c){
+  if (c === null || c === undefined) return '';
+  if (typeof c === 'boolean') return c ? 'VERDADERO' : 'FALSO';
+  if (typeof c === 'number') return fmtNum(c);
+  return String(c);
+}
+function renderRejilla(){
+  const h = libro.hojas[hojaActiva];
+  const nF = Math.min(h.maxFila, LIM_FILAS), nC = Math.min(h.maxCol, LIM_COLS);
+  const clavesEntrada = new Set(entradas.map(e => e.clave));
+  const clavesSalida = new Set(salidas.map(s => s.clave));
+  let html = '<table class="rejilla"><thead><tr><th></th>';
+  for (let c = 1; c <= nC; c++) html += `<th>${idxACol(c)}</th>`;
+  html += '</tr></thead><tbody>';
+  for (let f = 1; f <= nF; f++){
+    html += `<tr><th>${f}</th>`;
+    for (let c = 1; c <= nC; c++){
+      const ref = idxACol(c) + f;
+      const clave = claveDe(h.nombre, ref);
+      const celda = libro.celdas.get(clave);
+      let clases = [], contenido = '', titulo = '';
+      if (celda){
+        contenido = formatoCelda(celda.valorOriginal);
+        if (typeof celda.valorOriginal === 'string') clases.push('texto');
+        if (celda.formula){ clases.push('formula'); titulo = '=' + celda.formula; }
+        if (celda.formula && celda.estatica) clases.push('estatica-adv');
+      }
+      if (clavesEntrada.has(clave)) clases.push('entrada');
+      if (clavesSalida.has(clave)) clases.push('salida');
+      if (seleccion && seleccion.hoja === h.nombre && seleccion.ref === ref) clases.push('seleccionada');
+      html += `<td class="${clases.join(' ')}" data-ref="${ref}" ${titulo ? `title="${escapeHtml(titulo)}"` : ''}>${escapeHtml(contenido)}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  if (h.maxFila > LIM_FILAS || h.maxCol > LIM_COLS)
+    html += `<div style="padding:6px 10px;font-size:.76rem;color:var(--texto2)">Vista limitada a ${LIM_FILAS} filas × ${LIM_COLS} columnas; la simulación usa la hoja completa.</div>`;
+  $('contenedorRejilla').innerHTML = html;
+}
+$('contenedorRejilla').addEventListener('click', e => {
+  const td = e.target.closest('td[data-ref]');
+  if (!td) return;
+  const h = libro.hojas[hojaActiva];
+  const ref = td.dataset.ref;
+  const m = /^([A-Z]+)([0-9]+)$/.exec(ref);
+  seleccion = { hoja: h.nombre, ref, col: colAIdx(m[1]), fila: parseInt(m[2]) };
+  renderRejilla();
+  renderSeleccion();
+});
+/* ============================================================
+   PANEL DE SELECCIÓN
+   ============================================================ */
+function nombreSugerido(sel){
+  /* como Crystal Ball: usa el texto de la celda a la izquierda o encima */
+  for (const [dc, df] of [[-1,0],[-2,0],[0,-1]]){
+    const v = valorCelda(sel.hoja, sel.col + dc, sel.fila + df);
+    if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 40);
+  }
+  return sel.ref;
+}
+function renderSeleccion(){
+  if (!seleccion){
+    $('refSeleccion').textContent = '—';
+    $('contenidoSeleccion').textContent = '';
+    $('infoCelda').innerHTML = 'Haz clic en una celda de la hoja.';
+    $('botonesCelda').innerHTML = '';
+    return;
+  }
+  const clave = claveDe(seleccion.hoja, seleccion.ref);
+  const c = libro.celdas.get(clave);
+  $('refSeleccion').textContent = seleccion.hoja + '!' + seleccion.ref;
+  $('contenidoSeleccion').textContent = c ? (c.formula ? '=' + c.formula : formatoCelda(c.valorOriginal)) : '(vacía)';
+  const esEntrada = entradas.some(e => e.clave === clave);
+  const esSalida = salidas.some(s => s.clave === clave);
+  let info = `<b>${seleccion.hoja}!${seleccion.ref}</b> · `;
+  if (!c) info += 'celda vacía';
+  else if (c.formula) info += `fórmula${c.estatica ? ' <span style="color:#b26a00">(no recalculable: ' + escapeHtml(c.motivo) + ')</span>' : ''} — valor actual: <b>${formatoCelda(c.valorOriginal)}</b>`;
+  else info += `valor: <b>${formatoCelda(c.valorOriginal)}</b>`;
+  if (esEntrada){
+    const e = entradas.find(e => e.clave === clave);
+    info += `<br>🟢 Entrada «${escapeHtml(e.nombre)}» — ${DISTS[e.dist].nombre}: ${DISTS[e.dist].resumen(e.params)}`;
+  }
+  if (esSalida) info += `<br>🔵 Salida «${escapeHtml(salidas.find(s => s.clave === clave).nombre)}»`;
+  $('infoCelda').innerHTML = info;
+  let botones = '';
+  if (esEntrada){
+    botones += `<button class="btn btn-verde btn-mini" data-acc="editarEntrada">✎ Editar entrada</button>
+                <button class="btn btn-peligro btn-mini" data-acc="quitarEntrada">Quitar entrada</button>`;
+  } else if (esSalida){
+    botones += `<button class="btn btn-peligro btn-mini" data-acc="quitarSalida">Quitar salida</button>`;
+  } else {
+    botones += `<button class="btn btn-verde btn-mini" data-acc="definirEntrada">🟢 Definir como entrada</button>
+                <button class="btn btn-primario btn-mini" data-acc="definirSalida">🔵 Definir como salida</button>`;
+  }
+  $('botonesCelda').innerHTML = botones;
+}
+$('botonesCelda').addEventListener('click', e => {
+  const b = e.target.closest('button[data-acc]');
+  if (!b || !seleccion) return;
+  const clave = claveDe(seleccion.hoja, seleccion.ref);
+  const acc = b.dataset.acc;
+  if (acc === 'definirEntrada' || acc === 'editarEntrada') abrirModal(clave);
+  else if (acc === 'quitarEntrada'){ entradas = entradas.filter(x => x.clave !== clave); refrescarDefs(); }
+  else if (acc === 'definirSalida'){
+    const c = libro.celdas.get(clave);
+    if (!c || !c.formula)
+      mostrarAlertas(['Aviso: la celda de salida ' + clave + ' no contiene una fórmula; su valor no variará con la simulación.'], 'aviso');
+    if (c && c.formula && c.estatica)
+      mostrarAlertas(['Aviso: la fórmula de ' + clave + ' no es recalculable (' + escapeHtml(c.motivo) + '); su valor no variará.'], 'aviso');
+    salidas.push({ clave, hoja: seleccion.hoja, ref: seleccion.ref, nombre: nombreSugerido(seleccion) });
+    refrescarDefs();
+  }
+  else if (acc === 'quitarSalida'){ salidas = salidas.filter(x => x.clave !== clave); refrescarDefs(); }
+});
+function refrescarDefs(){
+  renderRejilla(); renderSeleccion(); renderListas();
+}
+function renderListas(){
+  $('numEntradas').textContent = entradas.length ? `(${entradas.length})` : '';
+  $('numSalidas').textContent = salidas.length ? `(${salidas.length})` : '';
+  $('listaEntradas').innerHTML = entradas.length ? entradas.map((e, i) => `
+    <div class="def-item">
+      <span class="punto" style="background:var(--verde)"></span>
+      <div class="info">
+        <div class="nom">${escapeHtml(e.nombre)} <span style="color:var(--texto2);font-weight:400">· ${e.clave}</span></div>
+        <div class="det">${DISTS[e.dist].nombre}: ${DISTS[e.dist].resumen(e.params)}</div>
+      </div>
+      <button class="btn btn-secundario btn-mini" data-editar="${i}">✎</button>
+      <button class="btn btn-peligro btn-mini" data-quitar="${i}">✕</button>
+    </div>`).join('') : '<p style="font-size:.8rem;color:var(--texto2)">Sin entradas definidas. Selecciona una celda con valor y pulsa «Definir como entrada».</p>';
+  $('listaSalidas').innerHTML = salidas.length ? salidas.map((s, i) => `
+    <div class="def-item">
+      <span class="punto" style="background:var(--acento2)"></span>
+      <div class="info">
+        <div class="nom">${escapeHtml(s.nombre)} <span style="color:var(--texto2);font-weight:400">· ${s.clave}</span></div>
+      </div>
+      <button class="btn btn-peligro btn-mini" data-quitar-salida="${i}">✕</button>
+    </div>`).join('') : '<p style="font-size:.8rem;color:var(--texto2)">Sin salidas definidas. Selecciona una celda con fórmula y pulsa «Definir como salida».</p>';
+}
+$('listaEntradas').addEventListener('click', e => {
+  const be = e.target.closest('button[data-editar]');
+  const bq = e.target.closest('button[data-quitar]');
+  if (be) abrirModal(entradas[parseInt(be.dataset.editar)].clave);
+  else if (bq){ entradas.splice(parseInt(bq.dataset.quitar), 1); refrescarDefs(); }
+});
+$('listaSalidas').addEventListener('click', e => {
+  const b = e.target.closest('button[data-quitar-salida]');
+  if (b){ salidas.splice(parseInt(b.dataset.quitarSalida), 1); refrescarDefs(); }
+});
+/* ============================================================
+   MODAL DE DISTRIBUCIÓN
+   ============================================================ */
+let modalClave = null;
+function abrirModal(clave){
+  modalClave = clave;
+  const c = libro.celdas.get(clave);
+  const existente = entradas.find(e => e.clave === clave);
+  const valorBase = c && typeof c.valorOriginal === 'number' ? c.valorOriginal : 0;
+  const dist = existente ? existente.dist : 'normal';
+  const params = existente ? { ...existente.params } : DISTS[dist].porDefecto(valorBase);
+  const [, hojaN, refN] = /^(.*)!([A-Z]+[0-9]+)$/.exec(clave);
+  $('tituloModal').textContent = 'Propiedades del supuesto — ' + clave;
+  $('subModal').textContent = 'Valor actual de la celda: ' + formatoCelda(c ? c.valorOriginal : null) +
+    (c && c.formula ? ' · Atención: esta celda contiene una fórmula que será reemplazada por el valor muestreado durante la simulación.' : '');
+  $('mNombre').value = existente ? existente.nombre : nombreSugerido({ hoja: hojaN, ref: refN, col: c ? c.col : colAIdx(/^[A-Z]+/.exec(refN)[0]), fila: parseInt(/[0-9]+$/.exec(refN)[0]) });
+  $('mDist').value = dist;
+  $('mError').textContent = '';
+  renderCamposModal(dist, params);
+  $('veloModal').classList.add('visible');
+}
+function renderCamposModal(dist, params){
+  const d = DISTS[dist];
+  $('mCampos').innerHTML = d.campos.map(([k, et]) =>
+    `<div><label>${et}</label><input type="number" step="any" data-param="${k}" value="${isFinite(params[k]) ? params[k] : ''}"></div>`).join('');
+  actualizarVistaDist();
+}
+function leerParamsModal(){
+  const p = {};
+  for (const inp of $('mCampos').querySelectorAll('input[data-param]'))
+    p[inp.dataset.param] = parseFloat(inp.value);
+  return p;
+}
+function actualizarVistaDist(){
+  const dist = $('mDist').value, d = DISTS[dist];
+  const p = leerParamsModal();
+  const c = $('canvasDist'), ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  const err = d.validar(p);
+  if (err){ $('mMediaTeorica').textContent = ''; $('mSdTeorica').textContent = ''; return; }
+  const [lo, hi] = d.rango(p);
+  const W = c.width, H = c.height, mB = 18;
+  let maxPdf = 0;
+  const pts = [];
+  for (let i = 0; i <= 200; i++){
+    const x = lo + (hi - lo) * i / 200;
+    const y = d.pdf(p, x);
+    pts.push([x, y]);
+    if (isFinite(y) && y > maxPdf) maxPdf = y;
+  }
+  if (maxPdf <= 0) maxPdf = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, H - mB);
+  for (let i = 0; i <= 200; i++){
+    const y = Math.min(pts[i][1] / maxPdf, 1);
+    ctx.lineTo(W * i / 200, H - mB - y * (H - mB - 8));
+  }
+  ctx.lineTo(W, H - mB);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#5cbf6e'); grad.addColorStop(1, '#2f9e44');
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.strokeStyle = '#1d6b45'; ctx.lineWidth = 1.4; ctx.stroke();
+  ctx.fillStyle = '#5b6b80'; ctx.font = '11px Segoe UI';
+  ctx.textAlign = 'left'; ctx.fillText(etiquetaCorta(lo), 4, H - 5);
+  ctx.textAlign = 'right'; ctx.fillText(etiquetaCorta(hi), W - 4, H - 5);
+  ctx.textAlign = 'center'; ctx.fillText(etiquetaCorta((lo + hi) / 2), W / 2, H - 5);
+  $('mMediaTeorica').textContent = 'Media = ' + fmtNum(d.mediaT(p));
+  $('mSdTeorica').textContent = 'Desv. Est. = ' + fmtNum(d.sdT(p));
+}
+$('mDist').addEventListener('change', () => {
+  const c = libro.celdas.get(modalClave);
+  const valorBase = c && typeof c.valorOriginal === 'number' ? c.valorOriginal : 0;
+  renderCamposModal($('mDist').value, DISTS[$('mDist').value].porDefecto(valorBase));
+});
+$('mCampos').addEventListener('input', actualizarVistaDist);
+$('mCancelar').addEventListener('click', () => $('veloModal').classList.remove('visible'));
+$('veloModal').addEventListener('click', e => { if (e.target === $('veloModal')) $('veloModal').classList.remove('visible'); });
+$('mAceptar').addEventListener('click', () => {
+  const dist = $('mDist').value, d = DISTS[dist];
+  const params = leerParamsModal();
+  const err = d.validar(params);
+  if (err){ $('mError').textContent = err; return; }
+  const nombre = $('mNombre').value.trim() || modalClave;
+  const [, hojaN, refN] = /^(.*)!([A-Z]+[0-9]+)$/.exec(modalClave);
+  const existente = entradas.find(e => e.clave === modalClave);
+  if (existente){ existente.nombre = nombre; existente.dist = dist; existente.params = params; }
+  else entradas.push({ clave: modalClave, hoja: hojaN, ref: refN, nombre, dist, params });
+  $('veloModal').classList.remove('visible');
+  refrescarDefs();
+});
+/* ============================================================
+   MOTOR DE SIMULACIÓN
+   ============================================================ */
+$('selIteraciones').addEventListener('change', () => {
+  $('cajaIterManual').style.display = $('selIteraciones').value === 'manual' ? '' : 'none';
+});
+$('btnRestablecer').addEventListener('click', () => {
+  if (simulando) return;
+  entradas = []; salidas = []; ultimo = null;
+  $('btnCSV').disabled = true; $('btnInforme').disabled = true;
+  $('panelResultados').innerHTML = '';
+  limpiarAlertas();
+  mostrarAlertas(['Definiciones de entradas y salidas eliminadas. El libro sigue cargado.'], 'info');
+  refrescarDefs();
+});
+function leerConfig(){
+  const errores = [];
+  let iter;
+  if ($('selIteraciones').value === 'manual'){
+    iter = Math.round(parseFloat($('inpIterManual').value));
+    if (!isFinite(iter) || iter < 100) errores.push('El número manual de iteraciones debe ser al menos 100.');
+    if (iter > 1000000) errores.push('Máximo 1.000.000 de iteraciones.');
+  } else iter = parseInt($('selIteraciones').value);
+  const semTxt = $('inpSemilla').value.trim();
+  let semilla = null;
+  if (semTxt !== ''){
+    semilla = Math.round(parseFloat(semTxt));
+    if (!isFinite(semilla)) errores.push('La semilla debe ser un número entero.');
+  }
+  return { iteraciones: iter, semilla, errores };
+}
+/* conjunto de fórmulas afectadas por las entradas, en orden topológico */
+function ordenAfectado(){
+  const clavesEntrada = new Set(entradas.map(e => e.clave));
+  const afectadas = new Set();
+  const pila = [...clavesEntrada];
+  while (pila.length){
+    const k = pila.pop();
+    for (const dep of (libro.dependientes.get(k) || [])){
+      if (!afectadas.has(dep) && !clavesEntrada.has(dep)){
+        afectadas.add(dep);
+        pila.push(dep);
+      }
+    }
+  }
+  return libro.ordenTopo.filter(k => afectadas.has(k)).map(k => libro.celdas.get(k));
+}
+$('btnEjecutar').addEventListener('click', () => {
+  if (simulando || !libro) return;
+  limpiarAlertas();
+  const cfg = leerConfig();
+  const errores = [...cfg.errores];
+  if (!entradas.length) errores.push('Define al menos una celda de <b>entrada</b> (selecciónala en la hoja y pulsa «Definir como entrada»).');
+  if (!salidas.length) errores.push('Define al menos una celda de <b>salida</b> con fórmula.');
+  for (const e of entradas){
+    const err = DISTS[e.dist].validar(e.params);
+    if (err) errores.push(`Entrada «${escapeHtml(e.nombre)}» (${e.clave}): ${err}`);
+  }
+  if (errores.length){ mostrarAlertas(errores, 'error'); return; }
+
+  const cadena = ordenAfectado();
+  const setAfectadas = new Set(cadena.map(c => claveDe(c.hoja, c.ref)));
+  const avisos = [];
+  for (const s of salidas){
+    const c = libro.celdas.get(s.clave);
+    if (!c || !c.formula || c.estatica || !setAfectadas.has(s.clave))
+      avisos.push(`La salida «${escapeHtml(s.nombre)}» (${s.clave}) no depende de ninguna entrada definida: su valor no variará.`);
+  }
+  /* verificación del motor con los valores originales */
+  const celdasEntrada = entradas.map(e => libro.celdas.get(e.clave)).filter(Boolean);
+  for (const c of cadena){
+    try { c.valor = evaluar(c.ast, c.hoja); } catch (err){ c.valor = c.valorOriginal; }
+  }
+  for (const s of salidas){
+    const c = libro.celdas.get(s.clave);
+    if (!c || c.valorOriginal === null || typeof c.valorOriginal !== 'number') continue;
+    const rec = typeof c.valor === 'number' ? c.valor : NaN;
+    const dif = Math.abs(rec - c.valorOriginal);
+    if (isFinite(rec) && dif > Math.max(1e-6, Math.abs(c.valorOriginal) * 1e-6))
+      avisos.push(`Verificación: el motor recalcula ${s.clave} = ${fmtNum(rec)} pero Excel guardó ${fmtNum(c.valorOriginal)}. ` +
+        'Puede haber funciones con comportamiento distinto; revisa los resultados con cautela.');
+  }
+  for (const c of cadena) c.valor = c.valorOriginal;
+  if (avisos.length) mostrarAlertas(avisos, 'aviso');
+
+  const N = cfg.iteraciones;
+  const semilla = cfg.semilla === null ? (Math.random() * 2**31) | 0 : cfg.semilla;
+  const rng = mulberry32(semilla);
+  const muestrasEnt = entradas.map(() => new Float64Array(N));
+  const muestrasSal = salidas.map(() => new Float64Array(N));
+  const celdasSalida = salidas.map(s => libro.celdas.get(s.clave));
+  let erroresFormula = 0;
+
+  simulando = true;
+  $('btnEjecutar').disabled = true;
+  $('btnEjecutar').textContent = '⏳ Simulando…';
+  progreso(true, 0);
+  let i = 0;
+  const costePorIter = Math.max(1, cadena.length);
+  const LOTE = Math.max(50, Math.min(20000, Math.floor(200000 / costePorIter)));
+  const t0 = performance.now();
+  (function paso(){
+    const fin = Math.min(N, i + LOTE);
+    for (; i < fin; i++){
+      for (let k = 0; k < entradas.length; k++){
+        const e = entradas[k];
+        const v = DISTS[e.dist].muestra(e.params, rng);
+        muestrasEnt[k][i] = v;
+        if (celdasEntrada[k]) celdasEntrada[k].valor = v;
+      }
+      for (const c of cadena){
+        try { c.valor = evaluar(c.ast, c.hoja); }
+        catch (err){ c.valor = NaN; erroresFormula++; }
+      }
+      for (let k = 0; k < salidas.length; k++){
+        const c = celdasSalida[k];
+        const v = c ? c.valor : NaN;
+        muestrasSal[k][i] = typeof v === 'number' && isFinite(v) ? v : NaN;
+      }
+    }
+    progreso(true, i / N);
+    if (i < N){ setTimeout(paso, 0); return; }
+    /* restaurar libro */
+    for (const c of celdasEntrada) if (c) c.valor = c.valorOriginal;
+    for (const c of cadena) c.valor = c.valorOriginal;
+    const ms = performance.now() - t0;
+    finalizarSimulacion({ cfg, semilla, ms, muestrasEnt, muestrasSal, erroresFormula, nCadena: cadena.length });
+  })();
+});
+function finalizarSimulacion(datos){
+  simulando = false;
+  $('btnEjecutar').disabled = false;
+  $('btnEjecutar').textContent = '▶ Ejecutar simulación';
+  progreso(false, 1);
+  const N = datos.cfg.iteraciones;
+  const analisis = salidas.map((s, k) => {
+    const brutas = datos.muestrasSal[k];
+    const validas = [];
+    for (let i = 0; i < N; i++) if (isFinite(brutas[i])) validas.push(brutas[i]);
+    const orden = Float64Array.from(validas);
+    orden.sort();
+    const est = orden.length ? estadisticas(orden) : null;
+    const pcts = {};
+    if (orden.length) [1,5,10,25,50,75,80,90,95,99].forEach(p => pcts[p] = percentil(orden, p));
+    /* sensibilidad: correlación de rangos entrada→salida */
+    const M = Math.min(N, 20000);
+    const salSub = new Float64Array(M);
+    let mSub = 0;
+    const idxSub = [];
+    for (let i = 0; i < N && mSub < M; i++) if (isFinite(brutas[i])){ salSub[mSub] = brutas[i]; idxSub.push(i); mSub++; }
+    const sensibilidad = entradas.map((e, j) => {
+      const entSub = new Float64Array(mSub);
+      for (let t = 0; t < mSub; t++) entSub[t] = datos.muestrasEnt[j][idxSub[t]];
+      return { nombre: e.nombre, clave: e.clave, r: mSub > 2 ? spearman(entSub.subarray(0, mSub), salSub.subarray(0, mSub)) : 0 };
+    }).sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+    return { salida: s, orden, est, pcts, sensibilidad, nInvalidas: N - orden.length,
+      valorBase: (libro.celdas.get(s.clave) || {}).valorOriginal,
+      certezaMin: '', certezaMax: '' };
+  });
+  ultimo = { ...datos, analisis, activa: 0 };
+  $('btnCSV').disabled = false;
+  $('btnInforme').disabled = false;
+  if (datos.erroresFormula)
+    mostrarAlertas([`${fmtNum(datos.erroresFormula, 0)} evaluaciones de fórmula dieron error durante la simulación (se registran como valores no válidos).`], 'aviso');
+  renderResultados();
+  $('panelResultados').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+/* ============================================================
+   RESULTADOS
+   ============================================================ */
+function renderResultados(){
+  if (!ultimo) return;
+  const res = ultimo;
+  const resumen = res.analisis.map(a => `
+    <tr>
+      <td>${escapeHtml(a.salida.nombre)} <span style="color:var(--texto2)">· ${a.salida.clave}</span></td>
+      <td>${a.est ? fmtNum(a.est.media) : '—'}</td>
+      <td>${a.est ? fmtNum(a.pcts[10]) : '—'}</td>
+      <td>${a.est ? fmtNum(a.pcts[50]) : '—'}</td>
+      <td>${a.est ? fmtNum(a.pcts[90]) : '—'}</td>
+      <td>${a.est ? fmtNum(a.est.sd) : '—'}</td>
+    </tr>`).join('');
+  const pest = res.analisis.map((a, i) =>
+    `<button class="${i === res.activa ? 'activa' : ''}" data-salida="${i}">${escapeHtml(a.salida.nombre)}</button>`).join('');
+  $('panelResultados').innerHTML = `
+    <div class="tarjeta">
+      <h2>📋 Resumen de salidas — ${fmtNum(res.cfg.iteraciones, 0)} iteraciones en ${fmtNum(res.ms / 1000, 1)} s · semilla ${res.semilla} · ${res.nCadena} fórmulas recalculadas por iteración</h2>
+      <table class="tabla"><thead><tr><th>Salida</th><th>Media</th><th>P10</th><th>P50</th><th>P90</th><th>Desv. Est.</th></tr></thead>
+      <tbody>${resumen}</tbody></table>
+    </div>
+    <div class="pestanas-salidas" id="pestanasSalidas">${pest}</div>
+    <div id="detalleSalida"></div>`;
+  $('pestanasSalidas').addEventListener('click', e => {
+    const b = e.target.closest('button[data-salida]');
+    if (!b) return;
+    ultimo.activa = parseInt(b.dataset.salida);
+    for (const x of $('pestanasSalidas').children) x.classList.toggle('activa', x === b);
+    renderDetalle();
+  });
+  renderDetalle();
+}
+function renderDetalle(){
+  const a = ultimo.analisis[ultimo.activa];
+  const cont = $('detalleSalida');
+  if (!a.est){
+    cont.innerHTML = `<div class="tarjeta"><div class="alerta error">Todos los valores simulados de esta salida fueron no válidos (errores de fórmula).</div></div>`;
+    return;
+  }
+  const est = a.est;
+  const tablaP = [1,5,10,25,50,75,90,95,99].map(p =>
+    `<tr><td>P${p}</td><td>${fmtNum(a.pcts[p])}</td><td>${p} % de las simulaciones quedaron por debajo de este valor</td></tr>`).join('');
+  const statsFilas = [
+    ['Iteraciones válidas', fmtNum(est.n, 0) + (a.nInvalidas ? ` (${fmtNum(a.nInvalidas,0)} descartadas)` : '')],
+    ['Media', fmtNum(est.media)],
+    ['Mediana (P50)', fmtNum(a.pcts[50])],
+    ['Desviación estándar', fmtNum(est.sd)],
+    ['Varianza', fmtNum(est.varianza)],
+    ['Sesgo (asimetría)', fmtNum(est.sesgo, 3)],
+    ['Curtosis (exceso)', fmtNum(est.curtosis, 3)],
+    ['Coef. de variación', isFinite(est.cv) ? fmtNum(est.cv, 3) : '—'],
+    ['Mínimo', fmtNum(est.min)],
+    ['Máximo', fmtNum(est.max)],
+    ['Rango', fmtNum(est.max - est.min)],
+    ['Error estándar de la media', fmtNum(est.errorEst)],
+    ['Valor original en el libro', a.valorBase !== null && a.valorBase !== undefined ? fmtNum(a.valorBase) : '—']
+  ].map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  cont.innerHTML = `
+    <div class="tarjetas-resumen">
+      <div class="tarjeta-metrica"><div class="etiqueta">Media</div><div class="valor">${fmtNum(est.media)}</div>
+        <div class="detalle">± ${fmtNum(est.errorEst)} (error estándar)</div></div>
+      <div class="tarjeta-metrica"><div class="etiqueta">P10</div><div class="valor">${fmtNum(a.pcts[10])}</div><div class="detalle">escenario bajo</div></div>
+      <div class="tarjeta-metrica"><div class="etiqueta">Mediana P50</div><div class="valor">${fmtNum(a.pcts[50])}</div><div class="detalle">escenario central</div></div>
+      <div class="tarjeta-metrica"><div class="etiqueta">P90</div><div class="valor">${fmtNum(a.pcts[90])}</div><div class="detalle">escenario alto</div></div>
+      <div class="tarjeta-metrica"><div class="etiqueta">Desv. estándar</div><div class="valor">${fmtNum(est.sd)}</div></div>
+      <div class="tarjeta-metrica"><div class="etiqueta">P(≤ valor original)</div>
+        <div class="valor">${typeof a.valorBase === 'number' ? fmtPct(fraccionMenorQue(a.orden, a.valorBase)) : '—'}</div>
+        <div class="detalle">${typeof a.valorBase === 'number' ? 'original: ' + fmtNum(a.valorBase) : ''}</div></div>
+    </div>
+    <div class="rejilla-graficos">
+      <div class="tarjeta">
+        <h2>📊 Histograma — ${escapeHtml(a.salida.nombre)}</h2>
+        <canvas class="grafico" id="canvasHist" height="260"></canvas>
+        <div class="certeza">
+          <div class="campo"><label>Certeza desde</label><input type="number" step="any" id="certMin" value="${a.certezaMin}" placeholder="−∞"></div>
+          <div class="campo"><label>hasta</label><input type="number" step="any" id="certMax" value="${a.certezaMax}" placeholder="+∞"></div>
+          <div class="resultado" id="certResultado"></div>
+        </div>
+        <p class="nota">La <b>certeza</b> es la probabilidad de que el resultado caiga dentro del rango indicado
+        (como en Crystal Ball). Deja un campo vacío para no acotar por ese lado.</p>
+      </div>
+      <div class="tarjeta">
+        <h2>📈 Probabilidad acumulada</h2>
+        <canvas class="grafico" id="canvasCDF" height="260"></canvas>
+        <p class="nota">Para cada valor, porcentaje de simulaciones con resultado igual o menor. Líneas: P10, P50 y P90.</p>
+      </div>
+    </div>
+    <div class="rejilla-graficos">
+      <div class="tarjeta">
+        <h2>🌪️ Sensibilidad (tornado)</h2>
+        <canvas class="grafico" id="canvasTornado" height="${Math.max(140, 44 + a.sensibilidad.length * 34)}"></canvas>
+        <p class="nota">Correlación de rangos (Spearman) entre cada entrada y esta salida: mide qué entradas
+        <b>impulsan el riesgo</b>. Positiva = al subir la entrada sube la salida; negativa = la baja.</p>
+      </div>
+      <div class="tarjeta">
+        <h2>📐 Estadísticas de la simulación</h2>
+        <table class="tabla"><tbody>${statsFilas}</tbody></table>
+      </div>
+    </div>
+    <div class="tarjeta">
+      <h2>📋 Percentiles — ${escapeHtml(a.salida.nombre)}</h2>
+      <table class="tabla"><thead><tr><th>Percentil</th><th>Valor</th><th>Interpretación</th></tr></thead><tbody>${tablaP}</tbody></table>
+      <details class="explicaciones">
+        <summary>ℹ️ ¿Qué significa cada métrica?</summary>
+        <dl>
+          <dt>Media</dt><dd>Promedio de todas las simulaciones válidas; su precisión se estima con el error estándar.</dd>
+          <dt>Mediana (P50)</dt><dd>La mitad de los escenarios quedó por debajo. Más representativa que la media cuando hay asimetría.</dd>
+          <dt>Percentiles P10 / P90</dt><dd>Delimitan el rango razonable: el 80 % de los escenarios cae entre ambos.</dd>
+          <dt>Desviación estándar y varianza</dt><dd>Miden la dispersión de los resultados: a mayor dispersión, mayor riesgo.</dd>
+          <dt>Sesgo</dt><dd>Asimetría de la distribución: positivo = cola larga hacia valores altos; negativo = hacia valores bajos.</dd>
+          <dt>Curtosis (exceso)</dt><dd>Peso de las colas frente a una normal: positivo = colas pesadas (más valores extremos).</dd>
+          <dt>Coeficiente de variación</dt><dd>Desviación estándar relativa a la media: permite comparar el riesgo de salidas de distinta escala.</dd>
+          <dt>Certeza</dt><dd>Probabilidad de que el resultado caiga en el rango que indiques: es la fracción de simulaciones dentro de él.</dd>
+          <dt>Sensibilidad (tornado)</dt><dd>Qué entradas explican la variabilidad de la salida; prioriza gestionar o estudiar mejor las de mayor barra.</dd>
+        </dl>
+      </details>
+    </div>`;
+  const actualizarCerteza = () => {
+    a.certezaMin = $('certMin').value;
+    a.certezaMax = $('certMax').value;
+    const lo = a.certezaMin.trim() === '' ? -Infinity : parseFloat(a.certezaMin);
+    const hi = a.certezaMax.trim() === '' ? Infinity : parseFloat(a.certezaMax);
+    let p = NaN;
+    if (!isNaN(lo) && !isNaN(hi) && lo <= hi)
+      p = (hi === Infinity ? 1 : fraccionMenorQue(a.orden, hi)) - (lo === -Infinity ? 0 : fraccionMenorQue(a.orden, lo));
+    $('certResultado').textContent = isFinite(p) ? 'Certeza: ' + fmtPct(Math.max(0, p)) : '';
+    dibujarHistograma($('canvasHist'), a, lo, hi);
+  };
+  $('certMin').addEventListener('input', actualizarCerteza);
+  $('certMax').addEventListener('input', actualizarCerteza);
+  actualizarCerteza();
+  dibujarCDF($('canvasCDF'), a);
+  dibujarTornado($('canvasTornado'), a.sensibilidad);
+}
+/* ============================================================
+   GRÁFICOS (Canvas puro)
+   ============================================================ */
+const COLORES = { eje:'#8d9bb2', rejilla:'#e7ecf4', barra:'#4263eb', barraFuera:'#c3cbdd',
+  linea:'#3050c8', p10:'#d6336c', p50:'#3050c8', p90:'#2f9e44' };
+const tooltip = $('tooltip');
+function moverTooltip(ev, html){
+  tooltip.innerHTML = html;
+  tooltip.style.display = 'block';
+  tooltip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 290) + 'px';
+  tooltip.style.top = (ev.clientY + 14) + 'px';
+}
+function ocultarTooltip(){ tooltip.style.display = 'none'; }
+function prepararCanvas(c){
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth || parseInt(c.getAttribute('data-ancho')) || 640;
+  const h = parseInt(c.getAttribute('height')) || 260;
+  c.width = w * dpr; c.height = h * dpr;
+  c.style.height = h + 'px';
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+function ticksBonitos(min, max, n){
+  const rango = max - min || 1;
+  const paso0 = rango / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(paso0)));
+  const norm = paso0 / mag;
+  const paso = (norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10) * mag;
+  const ini = Math.ceil(min / paso) * paso;
+  const t = [];
+  for (let v = ini; v <= max + paso * 1e-9; v += paso) t.push(v);
+  return t;
+}
+function dibujarHistograma(c, a, certLo, certHi){
+  if (!c) return;
+  const { ctx, w, h } = prepararCanvas(c);
+  const ord = a.orden, n = ord.length;
+  let lo = percentil(ord, 0.5), hi = percentil(ord, 99.5);
+  if (lo === hi){ lo -= 1; hi += 1; }
+  const NB = Math.min(48, Math.max(16, Math.round(Math.sqrt(n) / 3)));
+  const bins = new Array(NB).fill(0), anchoBin = (hi - lo) / NB;
+  for (let i = 0; i < n; i++){
+    const b = Math.floor((ord[i] - lo) / anchoBin);
+    if (b >= 0 && b < NB) bins[b]++;
+    else if (b === NB) bins[NB - 1]++;
+  }
+  const maxB = Math.max(...bins, 1);
+  const mL = 46, mR = 8, mT = 10, mB = 30;
+  const gw = w - mL - mR, gh = h - mT - mB;
+  ctx.strokeStyle = COLORES.rejilla; ctx.fillStyle = COLORES.eje;
+  ctx.font = '11px Segoe UI'; ctx.lineWidth = 1;
+  for (const t of ticksBonitos(0, maxB, 4)){
+    const y = mT + gh - (t / maxB) * gh;
+    ctx.beginPath(); ctx.moveTo(mL, y); ctx.lineTo(w - mR, y); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(fmtNum(t, 0), mL - 5, y + 4);
+  }
+  ctx.textAlign = 'center';
+  for (const t of ticksBonitos(lo, hi, 6)) ctx.fillText(etiquetaCorta(t), mL + (t - lo) / (hi - lo) * gw, h - 10);
+  const binsInfo = [];
+  for (let b = 0; b < NB; b++){
+    const x0 = mL + (b / NB) * gw, bw = gw / NB;
+    const bh = (bins[b] / maxB) * gh;
+    const v0 = lo + b * anchoBin, v1 = v0 + anchoBin;
+    const centro = (v0 + v1) / 2;
+    const dentro = centro >= (certLo ?? -Infinity) && centro <= (certHi ?? Infinity);
+    ctx.fillStyle = dentro ? COLORES.barra : COLORES.barraFuera;
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(x0 + 0.5, mT + gh - bh, Math.max(1, bw - 1.2), bh);
+    ctx.globalAlpha = 1;
+    binsInfo.push({ x0, x1: x0 + bw, v0, v1, cnt: bins[b] });
+  }
+  const est = a.est;
+  if (est.media >= lo && est.media <= hi){
+    const xm = mL + (est.media - lo) / (hi - lo) * gw;
+    ctx.strokeStyle = COLORES.p10; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(xm, mT); ctx.lineTo(xm, mT + gh); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = COLORES.p10; ctx.textAlign = xm > w - 90 ? 'right' : 'left';
+    ctx.fillText('media', xm + (xm > w - 90 ? -4 : 4), mT + 12);
+  }
+  ctx.strokeStyle = COLORES.eje;
+  ctx.beginPath(); ctx.moveTo(mL, mT + gh + 0.5); ctx.lineTo(w - mR, mT + gh + 0.5); ctx.stroke();
+  c.onmousemove = ev => {
+    const r = c.getBoundingClientRect();
+    const px = ev.clientX - r.left;
+    const b = binsInfo.find(bi => px >= bi.x0 && px < bi.x1);
+    if (b) moverTooltip(ev, `<b>${fmtNum(b.v0)} – ${fmtNum(b.v1)}</b><br>${fmtNum(b.cnt, 0)} simulaciones (${fmtPct(b.cnt / n)})`);
+    else ocultarTooltip();
+  };
+  c.onmouseleave = ocultarTooltip;
+}
+function dibujarCDF(c, a){
+  if (!c) return;
+  const { ctx, w, h } = prepararCanvas(c);
+  const ord = a.orden;
+  let lo = percentil(ord, 0.5), hi = percentil(ord, 99.5);
+  if (lo === hi){ lo -= 1; hi += 1; }
+  const mL = 40, mR = 8, mT = 10, mB = 30;
+  const gw = w - mL - mR, gh = h - mT - mB;
+  ctx.strokeStyle = COLORES.rejilla; ctx.fillStyle = COLORES.eje; ctx.font = '11px Segoe UI';
+  for (const p of [0, 25, 50, 75, 100]){
+    const y = mT + gh - (p / 100) * gh;
+    ctx.beginPath(); ctx.moveTo(mL, y); ctx.lineTo(w - mR, y); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText(p + '%', mL - 5, y + 4);
+  }
+  ctx.textAlign = 'center';
+  for (const t of ticksBonitos(lo, hi, 6)) ctx.fillText(etiquetaCorta(t), mL + (t - lo) / (hi - lo) * gw, h - 10);
+  for (const [p, col] of [[10, COLORES.p10], [50, COLORES.p50], [90, COLORES.p90]]){
+    const v = a.pcts[p];
+    if (v < lo || v > hi) continue;
+    const x = mL + (v - lo) / (hi - lo) * gw;
+    ctx.strokeStyle = col; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x, mT); ctx.lineTo(x, mT + gh); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = col; ctx.fillText('P' + p, x, mT + 10);
+  }
+  ctx.strokeStyle = COLORES.linea; ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  for (let px = 0; px <= gw; px += 2){
+    const v = lo + (px / gw) * (hi - lo);
+    const y = mT + gh - fraccionMenorQue(ord, v) * gh;
+    px === 0 ? ctx.moveTo(mL + px, y) : ctx.lineTo(mL + px, y);
+  }
+  ctx.stroke();
+  c.onmousemove = ev => {
+    const r = c.getBoundingClientRect();
+    const px = ev.clientX - r.left - mL;
+    if (px < 0 || px > gw){ ocultarTooltip(); return; }
+    const v = lo + (px / gw) * (hi - lo);
+    moverTooltip(ev, `<b>${fmtNum(v)}</b><br>${fmtPct(fraccionMenorQue(ord, v))} de las simulaciones ≤ este valor`);
+  };
+  c.onmouseleave = ocultarTooltip;
+}
+function dibujarTornado(c, sens){
+  if (!c) return;
+  const { ctx, w, h } = prepararCanvas(c);
+  if (!sens.length) return;
+  const mL = Math.min(180, w * 0.34), mR = 46, mT = 10, mB = 24;
+  const gw = w - mL - mR, gh = h - mT - mB;
+  const x0 = mL + gw / 2;
+  ctx.font = '11px Segoe UI';
+  ctx.strokeStyle = COLORES.rejilla;
+  for (const t of [-1, -0.5, 0, 0.5, 1]){
+    const x = x0 + t * gw / 2;
+    ctx.beginPath(); ctx.moveTo(x, mT); ctx.lineTo(x, mT + gh); ctx.stroke();
+    ctx.fillStyle = COLORES.eje; ctx.textAlign = 'center';
+    ctx.fillText(fmtNum(t, 1), x, h - 8);
+  }
+  const alto = Math.min(26, gh / sens.length * 0.7);
+  sens.forEach((s, i) => {
+    const cy = mT + gh * (i + 0.5) / sens.length;
+    const ancho = s.r * gw / 2;
+    ctx.fillStyle = s.r >= 0 ? COLORES.barra : COLORES.p10;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(Math.min(x0, x0 + ancho), cy - alto / 2, Math.abs(ancho), alto);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#1e2a3a'; ctx.textAlign = 'right';
+    const nom = s.nombre.length > 22 ? s.nombre.slice(0, 21) + '…' : s.nombre;
+    ctx.fillText(nom, mL - 8, cy + 4);
+    ctx.textAlign = s.r >= 0 ? 'left' : 'right';
+    ctx.fillText(fmtNum(s.r, 2), x0 + ancho + (s.r >= 0 ? 4 : -4), cy + 4);
+  });
+  ctx.strokeStyle = COLORES.eje;
+  ctx.beginPath(); ctx.moveTo(x0, mT); ctx.lineTo(x0, mT + gh); ctx.stroke();
+  c.onmousemove = ev => {
+    const r = c.getBoundingClientRect();
+    const i = Math.floor((ev.clientY - r.top - mT) / (gh / sens.length));
+    if (i >= 0 && i < sens.length)
+      moverTooltip(ev, `<b>${escapeHtml(sens[i].nombre)}</b> (${sens[i].clave})<br>Correlación de rangos: ${fmtNum(sens[i].r, 3)}`);
+    else ocultarTooltip();
+  };
+  c.onmouseleave = ocultarTooltip;
+}
+window.addEventListener('resize', (() => {
+  let t;
+  return () => { clearTimeout(t); t = setTimeout(() => { if (ultimo) renderDetalle(); }, 250); };
+})());
+/* ============================================================
+   EXPORTAR CSV
+   ============================================================ */
+$('btnCSV').addEventListener('click', () => {
+  if (!ultimo) return;
+  const res = ultimo;
+  const esc = s => '"' + String(s).replace(/"/g, '""') + '"';
+  const L = [];
+  L.push(esc('Simulador de Riesgos Monte Carlo — Excel'));
+  L.push([esc('Archivo'), esc(libro.nombreArchivo)].join(';'));
+  L.push([esc('Fecha'), esc(new Date().toLocaleString('es'))].join(';'));
+  L.push([esc('Iteraciones'), res.cfg.iteraciones, esc('Semilla'), res.semilla].join(';'));
+  L.push('');
+  L.push(esc('ENTRADAS (supuestos)'));
+  L.push(['Nombre','Celda','Distribución','Parámetros'].map(esc).join(';'));
+  for (const e of entradas)
+    L.push([esc(e.nombre), esc(e.clave), esc(DISTS[e.dist].nombre), esc(DISTS[e.dist].resumen(e.params))].join(';'));
+  L.push('');
+  for (const a of res.analisis){
+    L.push(esc('SALIDA: ' + a.salida.nombre + ' (' + a.salida.clave + ')'));
+    if (a.est){
+      const est = a.est;
+      L.push(['Métrica','Valor'].map(esc).join(';'));
+      const filas = [['Iteraciones válidas', est.n], ['Media', est.media], ['Mediana', a.pcts[50]],
+        ['Desviación estándar', est.sd], ['Varianza', est.varianza], ['Sesgo', est.sesgo],
+        ['Curtosis (exceso)', est.curtosis], ['Coef. variación', est.cv], ['Mínimo', est.min],
+        ['Máximo', est.max], ['Error estándar media', est.errorEst]];
+      for (const [k, v] of filas) L.push([esc(k), v].join(';'));
+      L.push(['Percentil','Valor'].map(esc).join(';'));
+      for (const p of [1,5,10,25,50,75,80,90,95,99]) L.push([esc('P' + p), a.pcts[p]].join(';'));
+      L.push(['Sensibilidad (Spearman)','r'].map(esc).join(';'));
+      for (const s of a.sensibilidad) L.push([esc(s.nombre + ' (' + s.clave + ')'), s.r].join(';'));
+    } else L.push(esc('Sin valores válidos'));
+    L.push('');
+  }
+  const NMAX = Math.min(res.cfg.iteraciones, 10000);
+  L.push(esc('MUESTRAS INDIVIDUALES (primeras ' + NMAX + ')'));
+  L.push(['Iteración', ...entradas.map(e => 'ENT: ' + e.nombre), ...salidas.map(s => 'SAL: ' + s.nombre)].map(esc).join(';'));
+  for (let i = 0; i < NMAX; i++){
+    const fila = [i + 1];
+    for (let k = 0; k < entradas.length; k++) fila.push(res.muestrasEnt[k][i]);
+    for (let k = 0; k < salidas.length; k++) fila.push(isFinite(res.muestrasSal[k][i]) ? res.muestrasSal[k][i] : '');
+    L.push(fila.join(';'));
+  }
+  const blob = new Blob(['﻿' + L.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const aEl = document.createElement('a');
+  aEl.href = URL.createObjectURL(blob);
+  aEl.download = 'montecarlo-' + libro.nombreArchivo.replace(/\.xlsx$/i, '') + '.csv';
+  aEl.click();
+  URL.revokeObjectURL(aEl.href);
+});
+/* ============================================================
+   INFORME IMPRIMIBLE
+   ============================================================ */
+$('btnInforme').addEventListener('click', () => {
+  if (!ultimo) return;
+  const res = ultimo;
+  let cuerpo = '';
+  for (let k = 0; k < res.analisis.length; k++){
+    const a = res.analisis[k];
+    if (!a.est){ cuerpo += `<h2>${escapeHtml(a.salida.nombre)}</h2><p>Sin valores válidos.</p>`; continue; }
+    /* dibujar gráficos fuera de pantalla */
+    const ch = document.createElement('canvas');
+    ch.setAttribute('height', '260'); ch.setAttribute('data-ancho', '660');
+    dibujarHistograma(ch, a, -Infinity, Infinity);
+    const cc = document.createElement('canvas');
+    cc.setAttribute('height', '260'); cc.setAttribute('data-ancho', '660');
+    dibujarCDF(cc, a);
+    const ct = document.createElement('canvas');
+    ct.setAttribute('height', String(Math.max(140, 44 + a.sensibilidad.length * 34)));
+    ct.setAttribute('data-ancho', '660');
+    dibujarTornado(ct, a.sensibilidad);
+    const est = a.est;
+    cuerpo += `
+    <h2>Salida: ${escapeHtml(a.salida.nombre)} (${a.salida.clave})</h2>
+    <table><tr><th>Métrica</th><th>Valor</th><th>Métrica</th><th>Valor</th></tr>
+      <tr><td>Media</td><td>${fmtNum(est.media)}</td><td>Desv. estándar</td><td>${fmtNum(est.sd)}</td></tr>
+      <tr><td>Mediana (P50)</td><td>${fmtNum(a.pcts[50])}</td><td>Coef. variación</td><td>${isFinite(est.cv) ? fmtNum(est.cv, 3) : '—'}</td></tr>
+      <tr><td>P10</td><td>${fmtNum(a.pcts[10])}</td><td>Sesgo</td><td>${fmtNum(est.sesgo, 3)}</td></tr>
+      <tr><td>P90</td><td>${fmtNum(a.pcts[90])}</td><td>Curtosis (exceso)</td><td>${fmtNum(est.curtosis, 3)}</td></tr>
+      <tr><td>Mínimo</td><td>${fmtNum(est.min)}</td><td>Máximo</td><td>${fmtNum(est.max)}</td></tr>
+      <tr><td>Iteraciones válidas</td><td>${fmtNum(est.n, 0)}</td><td>Valor original</td><td>${typeof a.valorBase === 'number' ? fmtNum(a.valorBase) : '—'}</td></tr>
+    </table>
+    <table><tr><th>Percentil</th>${[1,5,10,25,50,75,90,95,99].map(p => '<td>P' + p + '</td>').join('')}</tr>
+      <tr><th>Valor</th>${[1,5,10,25,50,75,90,95,99].map(p => '<td>' + fmtNum(a.pcts[p]) + '</td>').join('')}</tr></table>
+    <img src="${ch.toDataURL('image/png')}"><img src="${cc.toDataURL('image/png')}"><img src="${ct.toDataURL('image/png')}">
+    <p><b>Conclusión:</b> el valor esperado de «${escapeHtml(a.salida.nombre)}» es ${fmtNum(est.media)} (mediana ${fmtNum(a.pcts[50])});
+    el 80 % de los escenarios queda entre ${fmtNum(a.pcts[10])} y ${fmtNum(a.pcts[90])}.
+    ${a.sensibilidad.length ? 'La entrada con mayor influencia es «' + escapeHtml(a.sensibilidad[0].nombre) + '» (r = ' + fmtNum(a.sensibilidad[0].r, 2) + ').' : ''}</p>`;
+  }
+  const entradasTabla = entradas.map(e =>
+    `<tr><td>${escapeHtml(e.nombre)}</td><td>${e.clave}</td><td>${DISTS[e.dist].nombre}</td><td>${DISTS[e.dist].resumen(e.params)}</td></tr>`).join('');
+  const win = window.open('', '_blank');
+  if (!win){ mostrarAlertas(['El navegador bloqueó la ventana del informe. Permite las ventanas emergentes e inténtalo de nuevo.'], 'error'); return; }
+  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>Informe — Simulación Monte Carlo</title>
+  <style>
+    body{font-family:Segoe UI,Arial,sans-serif;color:#1e2a3a;max-width:800px;margin:24px auto;padding:0 20px;line-height:1.5}
+    h1{font-size:1.4rem;border-bottom:3px solid #2f9e44;padding-bottom:8px}
+    h2{font-size:1.05rem;margin-top:24px;color:#1d6b45;border-bottom:1px solid #ccd4e0;padding-bottom:4px}
+    table{border-collapse:collapse;width:100%;font-size:.85rem;margin:8px 0}
+    th,td{border:1px solid #ccd4e0;padding:5px 8px;text-align:left}
+    th{background:#eef2f9}
+    img{width:100%;max-width:680px;border:1px solid #ddd;border-radius:6px;margin:8px 0;display:block}
+    .meta{color:#5b6b80;font-size:.85rem}
+    .btn{background:#2f9e44;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:.95rem;cursor:pointer;margin:14px 0}
+    .pie{margin-top:26px;font-size:.78rem;color:#5b6b80;border-top:1px solid #ccd4e0;padding-top:10px}
+    @media print{.btn{display:none}}
+  </style></head><body>
+  <button class="btn" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
+  <h1>Informe de simulación Monte Carlo</h1>
+  <p class="meta">Libro: <b>${escapeHtml(libro.nombreArchivo)}</b> · Fecha: ${new Date().toLocaleString('es')} ·
+  Iteraciones: ${fmtNum(res.cfg.iteraciones, 0)} · Semilla: ${res.semilla} ·
+  Fórmulas recalculadas por iteración: ${res.nCadena}</p>
+  <h2>Entradas (supuestos)</h2>
+  <table><tr><th>Nombre</th><th>Celda</th><th>Distribución</th><th>Parámetros</th></tr>${entradasTabla}</table>
+  ${cuerpo}
+  <p>Recuerda: una probabilidad no garantiza un resultado, y la calidad de la simulación depende de la calidad de
+  los supuestos de entrada. Las entradas se muestrean de forma independiente (sin correlaciones).</p>
+  <div class="pie"><b>Aviso legal.</b> Herramienta gratuita de simulación con fines exclusivamente educativos e ilustrativos.
+  Los resultados dependen por completo de los supuestos ingresados y no constituyen asesoría financiera, contable,
+  tributaria ni legal, ni recomendaciones de inversión. Valide siempre con estudios propios y asesores profesionales.
+  Se ofrece “tal cual”, sin garantía de ningún tipo.<br>
+  © Juan Carlos Meza · Contenido bajo licencia CC BY-SA 4.0 · Contacto: juanxmeza@gmail.com</div>
+  </body></html>`);
+  win.document.close();
+});
+/* ============================================================
+   LIBRO DE EJEMPLO (sin archivo)
+   ============================================================ */
+$('btnEjemploLibro').addEventListener('click', () => {
+  const H = 'Modelo';
+  const filas = [
+    ['A1', 'Modelo de ejemplo — Estado de resultados anual'],
+    ['A3', 'Producto A: Precio Promedio por Unidad'], ['B3', 10],
+    ['A4', 'Producto B: Precio Promedio por Unidad'], ['B4', 22.5],
+    ['A5', 'Producto C: Precio Promedio por Unidad'], ['B5', 15.15],
+    ['A6', 'Cantidad de Ventas de Producto A (miles)'], ['B6', 50],
+    ['A7', 'Cantidad de Ventas de Producto B (miles)'], ['B7', 12],
+    ['A8', 'Cantidad de Ventas de Producto C (miles)'], ['B8', 20],
+    ['A10', 'Total de Ingresos'], ['B10', null, 'B3*B6+B4*B7+B5*B8'],
+    ['A11', 'Coste Directo (% de ingresos)'], ['B11', 0.15],
+    ['A12', 'Coste Directo de los Bienes Vendidos'], ['B12', null, 'B10*B11'],
+    ['A13', 'Utilidad Bruta'], ['B13', null, 'B10-B12'],
+    ['A14', 'Gastos de Operación'], ['B14', 157.5],
+    ['A15', 'Costes Administrativos y de Ventas'], ['B15', 76.75],
+    ['A16', 'EBITDA'], ['B16', null, 'B13-B14-B15'],
+    ['A17', 'Depreciación y Amortización'], ['B17', 22],
+    ['A18', 'Utilidad Antes de Impuestos'], ['B18', null, 'B16-B17'],
+    ['A19', 'Tasa Tributaria Efectiva'], ['B19', 0.3],
+    ['A20', 'Impuestos'], ['B20', null, 'MAX(0,B18*B19)'],
+    ['A21', 'Utilidad Neta'], ['B21', null, 'B18-B20'],
+    ['A23', 'Margen Neto (%)'], ['B23', null, 'IF(B10=0,0,B21/B10)']
+  ];
+  const lb = { nombreArchivo: 'modelo-ejemplo.xlsx (generado)', hojas: [{ nombre: H, maxFila: 1, maxCol: 1 }],
+    celdas: new Map(), ordenTopo: [], dependientes: new Map(), avisosCarga: [] };
+  const hoja = lb.hojas[0];
+  for (const [ref, valor, formula] of filas){
+    const m = /^([A-Z]+)([0-9]+)$/.exec(ref);
+    const col = colAIdx(m[1]), fila = parseInt(m[2]);
+    lb.celdas.set(claveDe(H, ref), { hoja: H, ref, fila, col, valor, valorOriginal: valor,
+      formula: formula || null, ast: null, deps: [], estatica: false, motivo: '' });
+    if (fila > hoja.maxFila) hoja.maxFila = fila;
+    if (col > hoja.maxCol) hoja.maxCol = col;
+  }
+  compilarLibro(lb);
+  /* calcular los valores iniciales de las fórmulas */
+  libro = lb;
+  for (const k of lb.ordenTopo){
+    const c = lb.celdas.get(k);
+    try { c.valor = evaluar(c.ast, c.hoja); c.valorOriginal = c.valor; } catch (e){}
+  }
+  iniciarLibro(lb);
+  /* definiciones de ejemplo listas para simular */
+  entradas = [
+    { clave: H + '!B3', hoja: H, ref: 'B3', nombre: 'Precio Producto A', dist: 'normal',     params: { media: 10, sd: 1 } },
+    { clave: H + '!B6', hoja: H, ref: 'B6', nombre: 'Ventas Producto A', dist: 'triangular', params: { min: 35, moda: 50, max: 70 } },
+    { clave: H + '!B11', hoja: H, ref: 'B11', nombre: 'Coste directo (%)', dist: 'uniforme', params: { min: 0.12, max: 0.19 } }
+  ];
+  salidas = [
+    { clave: H + '!B21', hoja: H, ref: 'B21', nombre: 'Utilidad Neta' },
+    { clave: H + '!B10', hoja: H, ref: 'B10', nombre: 'Total de Ingresos' }
+  ];
+  refrescarDefs();
+  mostrarAlertas(['Modelo de ejemplo generado con 3 entradas (verde) y 2 salidas (azul) ya definidas. Pulsa «Ejecutar simulación».'], 'info');
+});
+
+</script>
+</body>
+</html>

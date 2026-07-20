@@ -1,0 +1,11 @@
+# Archivos de trabajo que nunca deben llegar al repo público
+*.bak
+*.tmp
+*.xlsx
+*.env
+.env*
+
+# Basura de Windows
+desktop.ini
+Thumbs.db
+~$*
