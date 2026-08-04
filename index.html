@@ -254,9 +254,13 @@
             <h2>🟢 Entradas <span id="numEntradas" style="font-weight:400;color:var(--texto2);font-size:.8rem"></span></h2>
             <div class="lista-defs" id="listaEntradas"><p style="font-size:.8rem;color:var(--texto2)">Sin entradas definidas.</p></div>
           </div>
-          <div class="tarjeta" style="margin-bottom:0">
+          <div class="tarjeta" style="margin-bottom:10px">
             <h2>🔵 Salidas <span id="numSalidas" style="font-weight:400;color:var(--texto2);font-size:.8rem"></span></h2>
             <div class="lista-defs" id="listaSalidas"><p style="font-size:.8rem;color:var(--texto2)">Sin salidas definidas.</p></div>
+          </div>
+          <div class="tarjeta" style="margin-bottom:0" id="tarjetaCorrelaciones" hidden>
+            <h2>🔗 Correlaciones <span style="font-weight:400;color:var(--texto2);font-size:.8rem">(opcional)</span></h2>
+            <div id="listaCorrelaciones"></div>
           </div>
         </aside>
       </div>
@@ -292,7 +296,8 @@
         <h3>Limitaciones de esta herramienta</h3>
         <p>El motor recalcula las funciones más habituales (SUMA, SI, PROMEDIO, BUSCARV, VNA, TIR, SUMAPRODUCTO…, en su
         forma interna en inglés). Las fórmulas no soportadas conservan el último valor guardado por Excel y se marcan en
-        naranja. Las entradas se muestrean de forma <b>independiente</b> (sin correlaciones entre ellas).</p>
+        naranja. Por defecto las entradas se muestrean de forma <b>independiente</b>, pero puedes definir
+        <b>correlaciones</b> entre pares en el panel lateral (método Iman-Conover, conserva cada distribución).</p>
       </div>
     </div>
   </section>
@@ -452,6 +457,59 @@ function pearson(x, y){
   return dx>0&&dy>0 ? num/Math.sqrt(dx*dy) : 0;
 }
 function spearman(x, y){ return pearson(rangosPromedio(x), rangosPromedio(y)); }
+/* ---------- correlación entre entradas (Iman-Conover) ---------- */
+/* inversa de la normal estándar (aprox. Acklam) — para las puntuaciones de van der Waerden */
+function normInv(p){
+  if (p <= 0) return -38; if (p >= 1) return 38;
+  const a=[-39.696830286653757,220.94609842452050,-275.92851044696869,138.35775186726900,-30.664798066147160,2.5066282774592392];
+  const b=[-54.476098798224058,161.58583685804089,-155.69897985988661,66.801311887719720,-13.280681552885721];
+  const c=[-0.0077848940024302926,-0.32239645804113648,-2.4007582771618381,-2.5497325393437338,4.3746641414649678,2.9381639826987831];
+  const d=[0.0077846957090414622,0.32246712907003983,2.4451346140051557,3.7544086619074162];
+  const pl=0.02425;
+  if (p < pl){ const q=Math.sqrt(-2*Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+  if (p <= 1-pl){ const q=p-0.5, r=q*q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1); }
+  const q=Math.sqrt(-2*Math.log(1-p));
+  return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+}
+/* Cholesky (triangular inferior) de una matriz simétrica; null si no es positiva definida */
+function cholesky(A){
+  const n = A.length, L = Array.from({length:n}, () => new Float64Array(n));
+  for (let i=0;i<n;i++) for (let j=0;j<=i;j++){
+    let s = A[i][j];
+    for (let k=0;k<j;k++) s -= L[i][k]*L[j][k];
+    if (i===j){ if (s <= 1e-12) return null; L[i][j] = Math.sqrt(s); }
+    else L[i][j] = s / L[j][j];
+  }
+  return L;
+}
+/* Iman-Conover: reordena las muestras (in situ) para inducir la correlación de rangos
+   objetivo C, preservando exactamente cada distribución marginal. Devuelve false si C no es válida. */
+function inducirCorrelacion(muestras, C, rng){
+  const K = muestras.length, N = muestras[0].length;
+  const P = cholesky(C);
+  if (!P) return false;
+  const a = new Float64Array(N);                     /* puntuaciones de van der Waerden */
+  for (let i=0;i<N;i++) a[i] = normInv((i+1)/(N+1));
+  const M = [];                                      /* matriz de puntuaciones: columna k = a barajada */
+  for (let k=0;k<K;k++){
+    const col = Float64Array.from(a);
+    for (let i=N-1;i>0;i--){ const j = Math.floor(rng()*(i+1)); const t=col[i]; col[i]=col[j]; col[j]=t; }
+    M.push(col);
+  }
+  const idx = Array.from({length:N}, (_,i)=>i);
+  for (let k=0;k<K;k++){
+    const y = new Float64Array(N);                   /* Y_k = Σ_{j<=k} P[k][j]·M_j */
+    for (let j=0;j<=k;j++){ const p=P[k][j]; if (p!==0){ const Mj=M[j]; for (let i=0;i<N;i++) y[i]+=p*Mj[i]; } }
+    const orden = idx.slice().sort((x,z)=> y[x]-y[z]);          /* rangos de Y_k */
+    const ordenadas = Float64Array.from(muestras[k]).sort();    /* muestras ordenadas */
+    const out = new Float64Array(N);
+    for (let r=0;r<N;r++) out[orden[r]] = ordenadas[r];         /* mismo rango → mismo valor */
+    muestras[k] = out;
+  }
+  return true;
+}
 /* ---------- formato ---------- */
 function fmtNum(v, dec){
   if (v === null || v === undefined || !isFinite(v)) return '—';
@@ -1316,6 +1374,8 @@ const DISTS = {
 const $ = id => document.getElementById(id);
 let entradas = [];        /* [{clave, hoja, ref, nombre, dist, params}] */
 let salidas = [];         /* [{clave, hoja, ref, nombre}] */
+let correlaciones = {};   /* "claveA::claveB" (claves ordenadas) -> coef. en [-1,1] */
+function clavePar(a, b){ return a < b ? a + '::' + b : b + '::' + a; }
 let hojaActiva = 0;
 let seleccion = null;     /* {hoja, ref, col, fila} */
 let ultimo = null;        /* resultados de la última simulación */
@@ -1375,7 +1435,7 @@ function mostrarAlertasCarga(lista, tipo){
 }
 function iniciarLibro(lb){
   libro = lb;
-  entradas = []; salidas = []; seleccion = null; ultimo = null; hojaActiva = 0;
+  entradas = []; salidas = []; correlaciones = {}; seleccion = null; ultimo = null; hojaActiva = 0;
   $('pantallaCarga').style.display = 'none';
   $('app').style.display = '';
   $('nombreArchivo').textContent = '📄 ' + lb.nombreArchivo;
@@ -1393,7 +1453,7 @@ function iniciarLibro(lb){
 }
 $('btnQuitarArchivo').addEventListener('click', () => {
   if (simulando) return;
-  libro = null; entradas = []; salidas = []; ultimo = null;
+  libro = null; entradas = []; salidas = []; correlaciones = {}; ultimo = null;
   $('app').style.display = 'none';
   $('pantallaCarga').style.display = '';
   $('panelResultados').innerHTML = '';
@@ -1526,8 +1586,31 @@ $('botonesCelda').addEventListener('click', e => {
   else if (acc === 'quitarSalida'){ salidas = salidas.filter(x => x.clave !== clave); refrescarDefs(); }
 });
 function refrescarDefs(){
-  renderRejilla(); renderSeleccion(); renderListas();
+  renderRejilla(); renderSeleccion(); renderListas(); renderCorrelaciones();
 }
+function renderCorrelaciones(){
+  const tarjeta = $('tarjetaCorrelaciones');
+  if (entradas.length < 2){ tarjeta.hidden = true; return; }
+  tarjeta.hidden = false;
+  let html = '';
+  for (let i = 0; i < entradas.length; i++) for (let j = i + 1; j < entradas.length; j++){
+    const key = clavePar(entradas[i].clave, entradas[j].clave);
+    const v = correlaciones[key];
+    html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:.8rem">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(entradas[i].nombre)} ↔ ${escapeHtml(entradas[j].nombre)}">${escapeHtml(entradas[i].nombre)} ↔ ${escapeHtml(entradas[j].nombre)}</span>
+      <input type="number" step="0.1" min="-1" max="1" style="width:74px" data-corr="${key}" value="${typeof v === 'number' ? v : ''}" placeholder="0">
+    </div>`;
+  }
+  html += '<p style="font-size:.74rem;color:var(--texto2);margin-top:4px">Coeficiente de −1 a 1 entre cada par (correlación de rangos). Vacío o 0 = independientes. Se aplica al simular.</p>';
+  $('listaCorrelaciones').innerHTML = html;
+}
+$('listaCorrelaciones').addEventListener('input', e => {
+  const inp = e.target.closest('input[data-corr]');
+  if (!inp) return;
+  const key = inp.dataset.corr, v = parseFloat(inp.value);
+  if (inp.value.trim() === '' || v === 0) delete correlaciones[key];
+  else correlaciones[key] = Math.max(-1, Math.min(1, v));
+});
 function renderListas(){
   $('numEntradas').textContent = entradas.length ? `(${entradas.length})` : '';
   $('numSalidas').textContent = salidas.length ? `(${salidas.length})` : '';
@@ -1659,7 +1742,7 @@ $('selIteraciones').addEventListener('change', () => {
 });
 $('btnRestablecer').addEventListener('click', () => {
   if (simulando) return;
-  entradas = []; salidas = []; ultimo = null;
+  entradas = []; salidas = []; correlaciones = {}; ultimo = null;
   $('btnCSV').disabled = true; $('btnInforme').disabled = true;
   $('panelResultados').innerHTML = '';
   limpiarAlertas();
@@ -1765,7 +1848,7 @@ $('btnEjecutar').addEventListener('click', () => {
       avisos.push(`La salida «${escapeHtml(s.nombre)}» (${s.clave}) no depende de ninguna entrada definida: su valor no variará.`);
   }
   /* verificación del motor con los valores originales */
-  const celdasEntrada = entradas.map(e => libro.celdas.get(e.clave)).filter(Boolean);
+  const celdasEntrada = entradas.map(e => libro.celdas.get(e.clave));
   for (const c of cadena){
     try { c.valor = evaluar(c.ast, c.hoja); } catch (err){ c.valor = c.valorOriginal; }
   }
@@ -1782,6 +1865,7 @@ $('btnEjecutar').addEventListener('click', () => {
   if (avisos.length) mostrarAlertas(avisos, 'aviso');
 
   const N = cfg.iteraciones;
+  const K = entradas.length;
   const semilla = cfg.semilla === null ? (Math.random() * 2**31) | 0 : cfg.semilla;
   const rng = mulberry32(semilla);
   const muestrasEnt = entradas.map(() => new Float64Array(N));
@@ -1789,23 +1873,45 @@ $('btnEjecutar').addEventListener('click', () => {
   const celdasSalida = salidas.map(s => libro.celdas.get(s.clave));
   let erroresFormula = 0;
 
+  /* matriz de correlación objetivo (si el usuario definió pares) */
+  let matrizC = null, hayCorr = false;
+  for (let a = 0; a < K && !hayCorr; a++) for (let b = a + 1; b < K; b++)
+    if (correlaciones[clavePar(entradas[a].clave, entradas[b].clave)] !== undefined){ hayCorr = true; break; }
+  if (hayCorr){
+    matrizC = Array.from({length:K}, (_, a) => { const row = new Float64Array(K); row[a] = 1; return row; });
+    for (let a = 0; a < K; a++) for (let b = a + 1; b < K; b++){
+      const v = correlaciones[clavePar(entradas[a].clave, entradas[b].clave)];
+      if (typeof v === 'number') matrizC[a][b] = matrizC[b][a] = v;
+    }
+    if (!cholesky(matrizC)){
+      mostrarAlertas(['La matriz de correlación no es válida (no positiva definida). Suele pasar con coeficientes altos y contradictorios entre tres o más entradas; reduce alguno.'], 'error');
+      return;
+    }
+  }
+
   simulando = true;
   $('btnEjecutar').disabled = true;
   $('btnEjecutar').textContent = '⏳ Simulando…';
   progreso(true, 0);
+  const t0 = performance.now();
+  /* Fase A: generar todas las muestras de entrada (rápido, sin evaluar fórmulas) */
+  for (let k = 0; k < K; k++){
+    const e = entradas[k], col = muestrasEnt[k], d = DISTS[e.dist];
+    for (let ii = 0; ii < N; ii++) col[ii] = d.muestra(e.params, rng);
+  }
+  /* Fase B: inducir correlación reordenando (preserva marginales). ponytail: síncrono; si N>1e6 con correlación tarda unos segundos */
+  if (hayCorr){
+    inducirCorrelacion(muestrasEnt, matrizC, rng);
+    mostrarAlertas(['🔗 Correlación aplicada entre entradas (método Iman-Conover); cada distribución marginal se conserva.'], 'info');
+  }
+  /* Fase C: evaluar la cadena de fórmulas por lotes (no bloquea la interfaz) */
   let i = 0;
   const costePorIter = Math.max(1, cadena.length);
   const LOTE = Math.max(50, Math.min(20000, Math.floor(200000 / costePorIter)));
-  const t0 = performance.now();
   (function paso(){
     const fin = Math.min(N, i + LOTE);
     for (; i < fin; i++){
-      for (let k = 0; k < entradas.length; k++){
-        const e = entradas[k];
-        const v = DISTS[e.dist].muestra(e.params, rng);
-        muestrasEnt[k][i] = v;
-        if (celdasEntrada[k]) celdasEntrada[k].valor = v;
-      }
+      for (let k = 0; k < K; k++) if (celdasEntrada[k]) celdasEntrada[k].valor = muestrasEnt[k][i];
       for (const c of cadena){
         try { c.valor = evaluar(c.ast, c.hoja); }
         catch (err){ c.valor = NaN; erroresFormula++; }
@@ -1822,7 +1928,7 @@ $('btnEjecutar').addEventListener('click', () => {
     for (const c of celdasEntrada) if (c) c.valor = c.valorOriginal;
     for (const c of cadena) c.valor = c.valorOriginal;
     const ms = performance.now() - t0;
-    finalizarSimulacion({ cfg, semilla, ms, muestrasEnt, muestrasSal, erroresFormula, nCadena: cadena.length });
+    finalizarSimulacion({ cfg, semilla, ms, muestrasEnt, muestrasSal, erroresFormula, nCadena: cadena.length, correlado: hayCorr });
   })();
 });
 function finalizarSimulacion(datos){
@@ -2323,12 +2429,12 @@ $('btnInforme').addEventListener('click', () => {
   <h1>Informe de simulación Monte Carlo</h1>
   <p class="meta">Libro: <b>${escapeHtml(libro.nombreArchivo)}</b> · Fecha: ${new Date().toLocaleString('es')} ·
   Iteraciones: ${fmtNum(res.cfg.iteraciones, 0)} · Semilla: ${res.semilla} ·
-  Fórmulas recalculadas por iteración: ${res.nCadena}</p>
+  Fórmulas recalculadas por iteración: ${res.nCadena}${res.correlado ? ' · Correlación entre entradas: aplicada (Iman-Conover)' : ''}</p>
   <h2>Entradas (supuestos)</h2>
   <table><tr><th>Nombre</th><th>Celda</th><th>Distribución</th><th>Parámetros</th></tr>${entradasTabla}</table>
   ${cuerpo}
   <p>Recuerda: una probabilidad no garantiza un resultado, y la calidad de la simulación depende de la calidad de
-  los supuestos de entrada. Las entradas se muestrean de forma independiente (sin correlaciones).</p>
+  los supuestos de entrada. Las entradas se muestrean de forma independiente salvo que se definan correlaciones entre ellas.</p>
   <div class="pie"><b>Aviso legal.</b> Herramienta gratuita de simulación con fines exclusivamente educativos e ilustrativos.
   Los resultados dependen por completo de los supuestos ingresados y no constituyen asesoría financiera, contable,
   tributaria ni legal, ni recomendaciones de inversión. Valide siempre con estudios propios y asesores profesionales.
