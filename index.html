@@ -1682,21 +1682,66 @@ function leerConfig(){
   }
   return { iteraciones: iter, semilla, errores };
 }
-/* conjunto de fórmulas afectadas por las entradas, en orden topológico */
-function ordenAfectado(){
-  const clavesEntrada = new Set(entradas.map(e => e.clave));
+/* conjunto de fórmulas afectadas por un conjunto de celdas, en orden topológico */
+function cadenaAfectada(clavesInicio){
+  const inicio = new Set(clavesInicio);
   const afectadas = new Set();
-  const pila = [...clavesEntrada];
+  const pila = [...inicio];
   while (pila.length){
     const k = pila.pop();
     for (const dep of (libro.dependientes.get(k) || [])){
-      if (!afectadas.has(dep) && !clavesEntrada.has(dep)){
+      if (!afectadas.has(dep) && !inicio.has(dep)){
         afectadas.add(dep);
         pila.push(dep);
       }
     }
   }
   return libro.ordenTopo.filter(k => afectadas.has(k)).map(k => libro.celdas.get(k));
+}
+function ordenAfectado(){ return cadenaAfectada(entradas.map(e => e.clave)); }
+/* Punto de equilibrio: valor de una entrada que hace salida = objetivo (Buscar objetivo de Excel).
+   Bisección sobre el motor de fórmulas; las demás celdas quedan en su valor base. */
+function puntoEquilibrio(claveSalida, claveVariar, objetivo){
+  const salida = libro.celdas.get(claveSalida), variar = libro.celdas.get(claveVariar);
+  if (!salida || !variar) return { ok:false, msg:'Celda no encontrada.' };
+  const cadena = cadenaAfectada([claveVariar]);
+  if (!cadena.includes(salida)) return { ok:false, msg:'La salida no depende de esa entrada; elige otra.' };
+  const base = typeof variar.valorOriginal === 'number' ? variar.valorOriginal : 0;
+  const f = x => {
+    variar.valor = x;
+    for (const c of cadena){ try { c.valor = evaluar(c.ast, c.hoja); } catch(e){ c.valor = NaN; } }
+    const v = salida.valor;
+    return typeof v === 'number' && isFinite(v) ? v - objetivo : NaN;
+  };
+  /* bracket generoso: el equilibrio puede caer fuera del rango plausible de la entrada (eso es la holgura) */
+  const m = Math.abs(base) || 1;
+  let lo = base - 20 * m - 100, hi = base + 20 * m + 100;
+  const ent = entradas.find(e => e.clave === claveVariar);
+  if (ent && DISTS[ent.dist].rango){ const [rl, rh] = DISTS[ent.dist].rango(ent.params); lo = Math.min(lo, rl); hi = Math.max(hi, rh); }
+  const N = 400;
+  let px = lo, pf = f(lo), sol = null;
+  for (let i = 1; i <= N; i++){
+    const x = lo + (hi - lo) * i / N, fx = f(x);
+    if (isFinite(pf) && isFinite(fx)){
+      if (pf === 0){ sol = px; break; }
+      if (pf * fx < 0){                       /* cambio de signo → bisección */
+        let a1 = px, b1 = x, fa = pf;
+        for (let k = 0; k < 80; k++){
+          const mid = (a1 + b1) / 2, fm = f(mid);
+          if (!isFinite(fm)) break;
+          sol = mid;
+          if (Math.abs(fm) < 1e-9 || (b1 - a1) < 1e-12) break;
+          if (fa * fm < 0) b1 = mid; else { a1 = mid; fa = fm; }
+        }
+        break;
+      }
+    }
+    px = x; pf = fx;
+  }
+  variar.valor = variar.valorOriginal;
+  for (const c of cadena) c.valor = c.valorOriginal;
+  if (sol === null) return { ok:false, msg:'No se halló punto de equilibrio en el rango explorado; prueba otra entrada.' };
+  return { ok:true, valor: sol, base, holgura: base !== 0 ? (sol - base) / base : NaN };
 }
 $('btnEjecutar').addEventListener('click', () => {
   if (simulando || !libro) return;
@@ -1806,6 +1851,9 @@ function finalizarSimulacion(datos){
       for (let t = 0; t < mSub; t++) entSub[t] = datos.muestrasEnt[j][idxSub[t]];
       return { nombre: e.nombre, clave: e.clave, r: mSub > 2 ? spearman(entSub.subarray(0, mSub), salSub.subarray(0, mSub)) : 0 };
     }).sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+    /* % de contribución (|r| / Σ|r|) — la «% variación» del libro de Sapag */
+    const sumaAbs = sensibilidad.reduce((s, x) => s + Math.abs(x.r), 0) || 1;
+    sensibilidad.forEach(x => x.pct = Math.abs(x.r) / sumaAbs);
     return { salida: s, orden, est, pcts, sensibilidad, nInvalidas: N - orden.length,
       valorBase: (libro.celdas.get(s.clave) || {}).valorOriginal,
       certezaMin: '', certezaMax: '' };
@@ -1860,6 +1908,8 @@ function renderDetalle(){
     return;
   }
   const est = a.est;
+  const errRel = est.media !== 0 ? est.errorEst / Math.abs(est.media) : Infinity;
+  const fiable = errRel <= 0.001;
   const tablaP = [1,5,10,25,50,75,90,95,99].map(p =>
     `<tr><td>P${p}</td><td>${fmtNum(a.pcts[p])}</td><td>${p} % de las simulaciones quedaron por debajo de este valor</td></tr>`).join('');
   const statsFilas = [
@@ -1875,12 +1925,13 @@ function renderDetalle(){
     ['Máximo', fmtNum(est.max)],
     ['Rango', fmtNum(est.max - est.min)],
     ['Error estándar de la media', fmtNum(est.errorEst)],
+    ['Error relativo de la media', isFinite(errRel) ? fmtPct(errRel, 3) + (fiable ? ' ✔' : ' — sube iteraciones') : '—'],
     ['Valor original en el libro', a.valorBase !== null && a.valorBase !== undefined ? fmtNum(a.valorBase) : '—']
   ].map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
   cont.innerHTML = `
     <div class="tarjetas-resumen">
       <div class="tarjeta-metrica"><div class="etiqueta">Media</div><div class="valor">${fmtNum(est.media)}</div>
-        <div class="detalle">± ${fmtNum(est.errorEst)} (error estándar)</div></div>
+        <div class="detalle" style="color:${fiable ? 'var(--verde)' : 'var(--naranja,#e8590c)'}">± ${fmtNum(est.errorEst)} · error ${isFinite(errRel) ? fmtPct(errRel, 3) : '—'} ${fiable ? '✔ fiable' : '↑ más iteraciones'}</div></div>
       <div class="tarjeta-metrica"><div class="etiqueta">P10</div><div class="valor">${fmtNum(a.pcts[10])}</div><div class="detalle">escenario bajo</div></div>
       <div class="tarjeta-metrica"><div class="etiqueta">Mediana P50</div><div class="valor">${fmtNum(a.pcts[50])}</div><div class="detalle">escenario central</div></div>
       <div class="tarjeta-metrica"><div class="etiqueta">P90</div><div class="valor">${fmtNum(a.pcts[90])}</div><div class="detalle">escenario alto</div></div>
@@ -1912,7 +1963,8 @@ function renderDetalle(){
         <h2>🌪️ Sensibilidad (tornado)</h2>
         <canvas class="grafico" id="canvasTornado" height="${Math.max(140, 44 + a.sensibilidad.length * 34)}"></canvas>
         <p class="nota">Correlación de rangos (Spearman) entre cada entrada y esta salida: mide qué entradas
-        <b>impulsan el riesgo</b>. Positiva = al subir la entrada sube la salida; negativa = la baja.</p>
+        <b>impulsan el riesgo</b>. Positiva = al subir la entrada sube la salida; negativa = la baja.
+        El % es la contribución relativa (|r| ÷ Σ|r|) — la «% variación» de Sapag para aplicar Pareto 80/20.</p>
       </div>
       <div class="tarjeta">
         <h2>📐 Estadísticas de la simulación</h2>
@@ -1934,8 +1986,21 @@ function renderDetalle(){
           <dt>Coeficiente de variación</dt><dd>Desviación estándar relativa a la media: permite comparar el riesgo de salidas de distinta escala.</dd>
           <dt>Certeza</dt><dd>Probabilidad de que el resultado caiga en el rango que indiques: es la fracción de simulaciones dentro de él.</dd>
           <dt>Sensibilidad (tornado)</dt><dd>Qué entradas explican la variabilidad de la salida; prioriza gestionar o estudiar mejor las de mayor barra.</dd>
+          <dt>Error relativo de la media</dt><dd>Error estándar dividido por la media. Sapag recomienda subir iteraciones hasta que baje del 0,1 %: por debajo, el resultado es estable y casi no depende de la semilla.</dd>
+          <dt>Punto de equilibrio</dt><dd>Valor de una entrada que lleva la salida a un objetivo (típicamente 0), con las demás en su valor base. La «holgura» es cuánto puede moverse esa entrada antes de cruzar el objetivo.</dd>
         </dl>
       </details>
+    </div>
+    <div class="tarjeta">
+      <h2>🎯 Punto de equilibrio (buscar objetivo)</h2>
+      <p class="nota" style="margin-top:0">Halla qué valor de una entrada hace que «${escapeHtml(a.salida.nombre)}» alcance un objetivo (por defecto 0), manteniendo las demás en su valor base. Es la «holgura» o sensibilización del libro de Sapag; aplicado a un VPN incremental, da el punto de indiferencia entre dos opciones.</p>
+      <div class="certeza">
+        <div class="campo" style="width:230px"><label>Variar la entrada</label>
+          <select id="geVariar">${entradas.map((e, i) => `<option value="${i}">${escapeHtml(e.nombre)} · ${e.clave}</option>`).join('')}</select></div>
+        <div class="campo"><label>Objetivo de la salida</label><input type="number" step="any" id="geObjetivo" value="0"></div>
+        <button class="btn btn-primario btn-mini" id="geCalcular" style="height:34px">Calcular</button>
+        <div class="resultado" id="geResultado"></div>
+      </div>
     </div>`;
   const actualizarCerteza = () => {
     a.certezaMin = $('certMin').value;
@@ -1953,6 +2018,16 @@ function renderDetalle(){
   actualizarCerteza();
   dibujarCDF($('canvasCDF'), a);
   dibujarTornado($('canvasTornado'), a.sensibilidad);
+  const geCalc = () => {
+    const ent = entradas[parseInt($('geVariar').value)];
+    const obj = parseFloat($('geObjetivo').value);
+    if (!ent || !isFinite(obj)){ $('geResultado').textContent = 'Indica una entrada y un objetivo válido.'; return; }
+    const r = puntoEquilibrio(a.salida.clave, ent.clave, obj);
+    if (!r.ok){ $('geResultado').innerHTML = `<span style="color:var(--rojo)">${escapeHtml(r.msg)}</span>`; return; }
+    $('geResultado').innerHTML = `<b>${escapeHtml(ent.nombre)} = ${fmtNum(r.valor)}</b>` +
+      (isFinite(r.holgura) ? ` · holgura ${fmtPct(r.holgura, 1)} sobre base ${fmtNum(r.base)}` : ` · base ${fmtNum(r.base)}`);
+  };
+  if ($('geCalcular')) $('geCalcular').addEventListener('click', geCalc);
 }
 /* ============================================================
    GRÁFICOS (Canvas puro)
@@ -2116,7 +2191,8 @@ function dibujarTornado(c, sens){
     const nom = s.nombre.length > 22 ? s.nombre.slice(0, 21) + '…' : s.nombre;
     ctx.fillText(nom, mL - 8, cy + 4);
     ctx.textAlign = s.r >= 0 ? 'left' : 'right';
-    ctx.fillText(fmtNum(s.r, 2), x0 + ancho + (s.r >= 0 ? 4 : -4), cy + 4);
+    const etiq = fmtNum(s.r, 2) + (s.pct !== undefined ? ` (${fmtPct(s.pct, 0)})` : '');
+    ctx.fillText(etiq, x0 + ancho + (s.r >= 0 ? 4 : -4), cy + 4);
   });
   ctx.strokeStyle = COLORES.eje;
   ctx.beginPath(); ctx.moveTo(x0, mT); ctx.lineTo(x0, mT + gh); ctx.stroke();
@@ -2124,7 +2200,7 @@ function dibujarTornado(c, sens){
     const r = c.getBoundingClientRect();
     const i = Math.floor((ev.clientY - r.top - mT) / (gh / sens.length));
     if (i >= 0 && i < sens.length)
-      moverTooltip(ev, `<b>${escapeHtml(sens[i].nombre)}</b> (${sens[i].clave})<br>Correlación de rangos: ${fmtNum(sens[i].r, 3)}`);
+      moverTooltip(ev, `<b>${escapeHtml(sens[i].nombre)}</b> (${sens[i].clave})<br>Correlación de rangos: ${fmtNum(sens[i].r, 3)}${sens[i].pct !== undefined ? `<br>Contribución: ${fmtPct(sens[i].pct, 1)}` : ''}`);
     else ocultarTooltip();
   };
   c.onmouseleave = ocultarTooltip;
@@ -2159,12 +2235,13 @@ $('btnCSV').addEventListener('click', () => {
       const filas = [['Iteraciones válidas', est.n], ['Media', est.media], ['Mediana', a.pcts[50]],
         ['Desviación estándar', est.sd], ['Varianza', est.varianza], ['Sesgo', est.sesgo],
         ['Curtosis (exceso)', est.curtosis], ['Coef. variación', est.cv], ['Mínimo', est.min],
-        ['Máximo', est.max], ['Error estándar media', est.errorEst]];
+        ['Máximo', est.max], ['Error estándar media', est.errorEst],
+        ['Error relativo media', est.media !== 0 ? est.errorEst / Math.abs(est.media) : '']];
       for (const [k, v] of filas) L.push([esc(k), v].join(';'));
       L.push(['Percentil','Valor'].map(esc).join(';'));
       for (const p of [1,5,10,25,50,75,80,90,95,99]) L.push([esc('P' + p), a.pcts[p]].join(';'));
-      L.push(['Sensibilidad (Spearman)','r'].map(esc).join(';'));
-      for (const s of a.sensibilidad) L.push([esc(s.nombre + ' (' + s.clave + ')'), s.r].join(';'));
+      L.push(['Sensibilidad (Spearman)','r','% contribución'].map(esc).join(';'));
+      for (const s of a.sensibilidad) L.push([esc(s.nombre + ' (' + s.clave + ')'), s.r, s.pct !== undefined ? s.pct : ''].join(';'));
     } else L.push(esc('Sin valores válidos'));
     L.push('');
   }
