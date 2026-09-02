@@ -2248,7 +2248,7 @@ $('btnEjecutar').addEventListener('click', () => {
     for (const cc of procCeldas) for (const c of cc) if (c) c.valor = c.valorOriginal;
     for (const c of cadena) c.valor = c.valorOriginal;
     const ms = performance.now() - t0;
-    finalizarSimulacion({ cfg, semilla, ms, muestrasEnt, muestrasSal, erroresFormula, nCadena: cadena.length, correlado: hayCorr });
+    finalizarSimulacion({ cfg, semilla, ms, muestrasEnt, muestrasSal, procMuestras, procInfo: procesos.map(pr => ({ nombre: pr.nombre, hoja: pr.hoja, refs: pr.refs, proc: pr.proc })), erroresFormula, nCadena: cadena.length, correlado: hayCorr });
   })();
 });
 function finalizarSimulacion(datos){
@@ -2272,11 +2272,18 @@ function finalizarSimulacion(datos){
     let mSub = 0;
     const idxSub = [];
     for (let i = 0; i < N && mSub < M; i++) if (isFinite(brutas[i])){ salSub[mSub] = brutas[i]; idxSub.push(i); mSub++; }
-    const sensibilidad = entradas.map((e, j) => {
+    const sensEnt = entradas.map((e, j) => {
       const entSub = new Float64Array(mSub);
       for (let t = 0; t < mSub; t++) entSub[t] = datos.muestrasEnt[j][idxSub[t]];
       return { nombre: e.nombre, clave: e.clave, r: mSub > 2 ? spearman(entSub.subarray(0, mSub), salSub.subarray(0, mSub)) : 0 };
-    }).sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+    });
+    const sensProc = (datos.procMuestras || []).map((pm, j) => {
+      const sub = new Float64Array(mSub);
+      for (let t = 0; t < mSub; t++){ const fila = pm[idxSub[t]]; let sm = 0; for (let u = 0; u < fila.length; u++) sm += fila[u]; sub[t] = sm / fila.length; }
+      const pr = (datos.procInfo && datos.procInfo[j]) || { nombre: 'proceso', hoja: '', refs: ['',''] };
+      return { nombre: pr.nombre + ' (proceso)', clave: pr.hoja + '!' + pr.refs[0] + ':' + pr.refs[pr.refs.length - 1], r: mSub > 2 ? spearman(sub.subarray(0, mSub), salSub.subarray(0, mSub)) : 0, esProceso: true };
+    });
+    const sensibilidad = sensEnt.concat(sensProc).sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
     /* % de contribución (|r| / Σ|r|) — la «% variación» del libro de Sapag */
     const sumaAbs = sensibilidad.reduce((s, x) => s + Math.abs(x.r), 0) || 1;
     sensibilidad.forEach(x => x.pct = Math.abs(x.r) / sumaAbs);
@@ -2673,10 +2680,11 @@ $('btnCSV').addEventListener('click', () => {
   }
   const NMAX = Math.min(res.cfg.iteraciones, 10000);
   L.push(esc('MUESTRAS INDIVIDUALES (primeras ' + NMAX + ')'));
-  L.push(['Iteración', ...entradas.map(e => 'ENT: ' + e.nombre), ...salidas.map(s => 'SAL: ' + s.nombre)].map(esc).join(';'));
+  L.push(['Iteración', ...entradas.map(e => 'ENT: ' + e.nombre), ...((res.procInfo||[]).flatMap(pr => pr.refs.map(rf => 'PROC: ' + pr.nombre + '·' + rf))), ...salidas.map(s => 'SAL: ' + s.nombre)].map(esc).join(';'));
   for (let i = 0; i < NMAX; i++){
     const fila = [i + 1];
     for (let k = 0; k < entradas.length; k++) fila.push(res.muestrasEnt[k][i]);
+    if (res.procMuestras) for (let k = 0; k < res.procMuestras.length; k++){ const fp = res.procMuestras[k][i]; for (let t = 0; t < fp.length; t++) fila.push(fp[t]); }
     for (let k = 0; k < salidas.length; k++) fila.push(isFinite(res.muestrasSal[k][i]) ? res.muestrasSal[k][i] : '');
     L.push(fila.join(';'));
   }
