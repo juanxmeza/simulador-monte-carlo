@@ -210,6 +210,13 @@
             <option value="manual">Manual…</option>
           </select>
         </div>
+        <div class="campo">
+          <label for="selMuestreo">Muestreo</label>
+          <select id="selMuestreo" title="Hipercubo Latino: mejor convergencia con las mismas iteraciones (lo usan Crystal Ball y @RISK por defecto).">
+            <option value="lhs" selected>Hipercubo Latino</option>
+            <option value="simple">Aleatorio simple</option>
+          </select>
+        </div>
         <div class="campo" id="cajaIterManual" style="display:none">
           <label for="inpIterManual">Nº manual</label>
           <input type="number" id="inpIterManual" min="100" max="1000000" step="100" value="20000">
@@ -1368,6 +1375,67 @@ const DISTS = {
     resumen: p => `media=${fmtNum(p.media)}`
   }
 };
+
+/* ============================================================
+   HIPERCUBO LATINO (LHS): inversas de CDF + muestreo estratificado.
+   Añadido 2026-09-02. Reusa logGamma() ya definido. No modifica DISTS.
+   ============================================================ */
+function invNorm(p){
+  if(p<=0)return -Infinity; if(p>=1)return Infinity;
+  const a=[-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00];
+  const b=[-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,6.680131188771972e+01,-1.328068155288572e+01];
+  const c=[-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,-2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00];
+  const d=[7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,3.754408661907416e+00];
+  const pl=0.02425, ph=1-pl; let q,r;
+  if(p<pl){ q=Math.sqrt(-2*Math.log(p)); return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+  if(p<=ph){ q=p-0.5; r=q*q; return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1); }
+  q=Math.sqrt(-2*Math.log(1-p)); return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+}
+function betacf(a,b,x){
+  const MAXIT=300, EPS=3e-14, FPMIN=1e-300;
+  let qab=a+b, qap=a+1, qam=a-1, c=1, d=1-qab*x/qap;
+  if(Math.abs(d)<FPMIN)d=FPMIN; d=1/d; let h=d;
+  for(let m=1;m<=MAXIT;m++){ const m2=2*m;
+    let aa=m*(b-m)*x/((qam+m2)*(a+m2));
+    d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN; c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN; d=1/d; h*=d*c;
+    aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));
+    d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN; c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN; d=1/d; const del=d*c; h*=del;
+    if(Math.abs(del-1)<EPS) break;
+  }
+  return h;
+}
+function betainc(x,a,b){
+  if(x<=0)return 0; if(x>=1)return 1;
+  const lbeta=logGamma(a)+logGamma(b)-logGamma(a+b);
+  const bt=Math.exp(a*Math.log(x)+b*Math.log(1-x)-lbeta);
+  return x<(a+1)/(a+b+2) ? bt*betacf(a,b,x)/a : 1-bt*betacf(b,a,1-x)/b;
+}
+function invBetainc(p,a,b){
+  if(p<=0)return 0; if(p>=1)return 1;
+  let lo=0, hi=1;
+  for(let it=0;it<100;it++){ const mid=(lo+hi)/2; if(betainc(mid,a,b)<p) lo=mid; else hi=mid; if(hi-lo<1e-12) break; }
+  return (lo+hi)/2;
+}
+/* inversa de CDF por distribucion (params, u in (0,1)) -> valor */
+const ICDF = {
+  uniforme:    (p,u)=> p.min + (p.max-p.min)*u,
+  exponencial: (p,u)=> -p.media*Math.log(1-u),
+  triangular:  (p,u)=>{ const fc=(p.moda-p.min)/(p.max-p.min);
+    return u<fc ? p.min+Math.sqrt(u*(p.max-p.min)*(p.moda-p.min))
+                : p.max-Math.sqrt((1-u)*(p.max-p.min)*(p.max-p.moda)); },
+  normal:      (p,u)=> p.media + p.sd*invNorm(u),
+  lognormal:   (p,u)=>{ const s2=Math.log(1+(p.sd*p.sd)/(p.media*p.media)), mu=Math.log(p.media)-s2/2; return Math.exp(mu+Math.sqrt(s2)*invNorm(u)); },
+  pert:        (p,u)=>{ const al=1+4*(p.moda-p.min)/(p.max-p.min), be=1+4*(p.max-p.moda)/(p.max-p.min); return p.min+(p.max-p.min)*invBetainc(u,al,be); }
+};
+/* N muestras por Hipercubo Latino: un estrato por muestra + barajado (Fisher-Yates).
+   Se conserva la marginal exacta y es compatible con la correlacion Iman-Conover (que reordena despues). */
+function muestrasLHS(fn, params, N, rng){
+  const x=new Float64Array(N);
+  for(let i=0;i<N;i++){ let u=(i+rng())/N; if(u<1e-9)u=1e-9; else if(u>1-1e-9)u=1-1e-9; x[i]=fn(params,u); }
+  for(let i=N-1;i>0;i--){ const j=(rng()*(i+1))|0; const t=x[i]; x[i]=x[j]; x[j]=t; }
+  return x;
+}
+
 /* ============================================================
    ESTADO DE LA APLICACIÓN
    ============================================================ */
@@ -1763,7 +1831,8 @@ function leerConfig(){
     semilla = Math.round(parseFloat(semTxt));
     if (!isFinite(semilla)) errores.push('La semilla debe ser un número entero.');
   }
-  return { iteraciones: iter, semilla, errores };
+  const muestreo = ($('selMuestreo') && $('selMuestreo').value === 'simple') ? 'simple' : 'lhs';
+  return { iteraciones: iter, semilla, muestreo, errores };
 }
 /* conjunto de fórmulas afectadas por un conjunto de celdas, en orden topológico */
 function cadenaAfectada(clavesInicio){
@@ -1896,8 +1965,13 @@ $('btnEjecutar').addEventListener('click', () => {
   const t0 = performance.now();
   /* Fase A: generar todas las muestras de entrada (rápido, sin evaluar fórmulas) */
   for (let k = 0; k < K; k++){
-    const e = entradas[k], col = muestrasEnt[k], d = DISTS[e.dist];
-    for (let ii = 0; ii < N; ii++) col[ii] = d.muestra(e.params, rng);
+    const e = entradas[k], d = DISTS[e.dist];
+    if (cfg.muestreo === 'lhs' && ICDF[e.dist]){
+      muestrasEnt[k] = muestrasLHS(ICDF[e.dist], e.params, N, rng);   // Hipercubo Latino
+    } else {
+      const col = muestrasEnt[k];
+      for (let ii = 0; ii < N; ii++) col[ii] = d.muestra(e.params, rng);
+    }
   }
   /* Fase B: inducir correlación reordenando (preserva marginales). ponytail: síncrono; si N>1e6 con correlación tarda unos segundos */
   if (hayCorr){
@@ -1991,7 +2065,7 @@ function renderResultados(){
     `<button class="${i === res.activa ? 'activa' : ''}" data-salida="${i}">${escapeHtml(a.salida.nombre)}</button>`).join('');
   $('panelResultados').innerHTML = `
     <div class="tarjeta">
-      <h2>📋 Resumen de salidas — ${fmtNum(res.cfg.iteraciones, 0)} iteraciones en ${fmtNum(res.ms / 1000, 1)} s · semilla ${res.semilla} · ${res.nCadena} fórmulas recalculadas por iteración</h2>
+      <h2>📋 Resumen de salidas — ${fmtNum(res.cfg.iteraciones, 0)} iteraciones en ${fmtNum(res.ms / 1000, 1)} s · semilla ${res.semilla} · ${res.nCadena} fórmulas recalculadas por iteración · muestreo ${res.cfg.muestreo === 'simple' ? 'aleatorio simple' : 'Hipercubo Latino'}</h2>
       <table class="tabla"><thead><tr><th>Salida</th><th>Media</th><th>P10</th><th>P50</th><th>P90</th><th>Desv. Est.</th></tr></thead>
       <tbody>${resumen}</tbody></table>
     </div>
