@@ -271,6 +271,11 @@
             <h2>🔵 Salidas <span id="numSalidas" style="font-weight:400;color:var(--texto2);font-size:.8rem"></span></h2>
             <div class="lista-defs" id="listaSalidas"><p style="font-size:.8rem;color:var(--texto2)">Sin salidas definidas.</p></div>
           </div>
+          <div class="tarjeta" style="margin-bottom:10px">
+            <h2>🌊 Entradas de proceso <span id="numProcesos" style="font-weight:400;color:var(--texto2);font-size:.8rem"></span></h2>
+            <div class="lista-defs" id="listaProcesos"><p style="font-size:.8rem;color:var(--texto2)">Sin procesos definidos.</p></div>
+            <button class="btn btn-secundario btn-mini" id="btnAddProceso" style="margin-top:8px">➕ Añadir entrada de proceso</button>
+          </div>
           <div class="tarjeta" style="margin-bottom:0" id="tarjetaCorrelaciones" hidden>
             <h2>🔗 Correlaciones <span style="font-weight:400;color:var(--texto2);font-size:.8rem">(opcional)</span></h2>
             <div id="listaCorrelaciones"></div>
@@ -399,6 +404,36 @@
     <div class="acciones-modal">
       <button class="btn btn-secundario" id="mCancelar">Cancelar</button>
       <button class="btn btn-primario" id="mAceptar">Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<div class="velo" id="veloProceso">
+  <div class="modal">
+    <h2>🌊 Entrada de proceso (serie temporal)</h2>
+    <div class="sub">Asigna un proceso estocástico a un <b>rango</b> de celdas (una fila o columna de períodos). En cada iteración se genera una trayectoria coherente y se rellena el rango. <b>Cada celda = un período</b>; los parámetros son por período.</div>
+    <div class="fila">
+      <div><label>Nombre</label><input type="text" id="prNombre" placeholder="p. ej. Inflación anual"></div>
+      <div><label>Hoja</label><select id="prHoja"></select></div>
+    </div>
+    <div class="fila">
+      <div><label>Rango de celdas</label><input type="text" id="prRango" placeholder="p. ej. B5:G5 (fila) o B2:B7 (columna)"></div>
+      <div><label>Proceso</label>
+        <select id="prProc">
+          <option value="gbm">Browniano geométrico (GBM)</option>
+          <option value="ou">Ornstein-Uhlenbeck (reversión a la media)</option>
+          <option value="abm">Browniano aritmético</option>
+          <option value="cir">Feller / CIR</option>
+          <option value="puente">Puente browniano</option>
+          <option value="merton">Merton (GBM con saltos)</option>
+        </select>
+      </div>
+    </div>
+    <div class="fila c3" id="prCampos"></div>
+    <div id="prError" style="color:var(--rojo);font-size:.8rem;margin-bottom:6px"></div>
+    <div class="acciones-modal">
+      <button class="btn btn-secundario" id="prCancelar">Cancelar</button>
+      <button class="btn btn-primario" id="prAceptar">Guardar</button>
     </div>
   </div>
 </div>
@@ -1524,6 +1559,7 @@ const $ = id => document.getElementById(id);
 let entradas = [];        /* [{clave, hoja, ref, nombre, dist, params}] */
 let salidas = [];         /* [{clave, hoja, ref, nombre}] */
 let correlaciones = {};   /* "claveA::claveB" (claves ordenadas) -> coef. en [-1,1] */
+let procesos = [];        /* [{claves:[], refs:[], hoja, nombre, proc, params}] entradas de serie temporal */
 function clavePar(a, b){ return a < b ? a + '::' + b : b + '::' + a; }
 let hojaActiva = 0;
 let seleccion = null;     /* {hoja, ref, col, fila} */
@@ -1584,7 +1620,8 @@ function mostrarAlertasCarga(lista, tipo){
 }
 function iniciarLibro(lb){
   libro = lb;
-  entradas = []; salidas = []; correlaciones = {}; seleccion = null; ultimo = null; hojaActiva = 0;
+  entradas = []; salidas = []; correlaciones = {}; procesos = []; seleccion = null; ultimo = null; hojaActiva = 0;
+  if (typeof procRenderLista === 'function') procRenderLista();
   $('pantallaCarga').style.display = 'none';
   $('app').style.display = '';
   $('nombreArchivo').textContent = '📄 ' + lb.nombreArchivo;
@@ -2100,7 +2137,7 @@ $('btnEjecutar').addEventListener('click', () => {
   limpiarAlertas();
   const cfg = leerConfig();
   const errores = [...cfg.errores];
-  if (!entradas.length) errores.push('Define al menos una celda de <b>entrada</b> (selecciónala en la hoja y pulsa «Definir como entrada»).');
+  if (!entradas.length && !procesos.length) errores.push('Define al menos una celda de <b>entrada</b> o una <b>entrada de proceso</b>.');
   if (!salidas.length) errores.push('Define al menos una celda de <b>salida</b> con fórmula.');
   for (const e of entradas){
     const err = DISTS[e.dist].validar(e.params);
@@ -2108,7 +2145,7 @@ $('btnEjecutar').addEventListener('click', () => {
   }
   if (errores.length){ mostrarAlertas(errores, 'error'); return; }
 
-  const cadena = ordenAfectado();
+  const cadena = cadenaAfectada([...entradas.map(e => e.clave), ...procesos.flatMap(pr => pr.claves)]);
   const setAfectadas = new Set(cadena.map(c => claveDe(c.hoja, c.ref)));
   const avisos = [];
   for (const s of salidas){
@@ -2173,6 +2210,13 @@ $('btnEjecutar').addEventListener('click', () => {
       for (let ii = 0; ii < N; ii++) col[ii] = d.muestra(e.params, rng);
     }
   }
+  /* Fase A2: trayectorias de las entradas de proceso (serie temporal). Cada celda = un período (dt=1). */
+  const procCeldas = procesos.map(pr => pr.claves.map(k => libro.celdas.get(k)));
+  const procMuestras = procesos.map(pr => {
+    const L = pr.claves.length, paths = new Array(N);
+    for (let ii = 0; ii < N; ii++){ const path = window.__stoch.genPath(pr.proc, pr.params, L, L, rng); const fila = new Float64Array(L); for (let t = 0; t < L; t++) fila[t] = path[t+1]; paths[ii] = fila; }
+    return paths;
+  });
   /* Fase B: inducir correlación reordenando (preserva marginales). ponytail: síncrono; si N>1e6 con correlación tarda unos segundos */
   if (hayCorr){
     inducirCorrelacion(muestrasEnt, matrizC, rng);
@@ -2186,6 +2230,7 @@ $('btnEjecutar').addEventListener('click', () => {
     const fin = Math.min(N, i + LOTE);
     for (; i < fin; i++){
       for (let k = 0; k < K; k++) if (celdasEntrada[k]) celdasEntrada[k].valor = muestrasEnt[k][i];
+      for (let pr = 0; pr < procCeldas.length; pr++){ const cc = procCeldas[pr], mm = procMuestras[pr][i]; for (let t = 0; t < cc.length; t++) if (cc[t]) cc[t].valor = mm[t]; }
       for (const c of cadena){
         try { c.valor = evaluar(c.ast, c.hoja); }
         catch (err){ c.valor = NaN; erroresFormula++; }
@@ -2200,6 +2245,7 @@ $('btnEjecutar').addEventListener('click', () => {
     if (i < N){ setTimeout(paso, 0); return; }
     /* restaurar libro */
     for (const c of celdasEntrada) if (c) c.valor = c.valorOriginal;
+    for (const cc of procCeldas) for (const c of cc) if (c) c.valor = c.valorOriginal;
     for (const c of cadena) c.valor = c.valorOriginal;
     const ms = performance.now() - t0;
     finalizarSimulacion({ cfg, semilla, ms, muestrasEnt, muestrasSal, erroresFormula, nCadena: cadena.length, correlado: hayCorr });
@@ -2861,6 +2907,66 @@ $('btnEjemploLibro').addEventListener('click', () => {
     $('pcSimular').addEventListener('click',simular);
     renderCampos();
   }
+  window.__stoch = { genPath: genPath, PROC: PROC };
+})();
+
+/* ===== Entradas de proceso (serie temporal): asignar un proceso estocastico a un rango ===== */
+let _procEdit = -1;
+function procExpandir(hoja, rango){
+  if(!rango) return null;
+  const m=/^\s*([A-Za-z]+)(\d+)\s*:\s*([A-Za-z]+)(\d+)\s*$/.exec(rango);
+  if(!m) return null;
+  const c1=colAIdx(m[1]), r1=+m[2], c2=colAIdx(m[3]), r2=+m[4];
+  const claves=[], refs=[];
+  if(r1===r2){ const a=Math.min(c1,c2), b=Math.max(c1,c2); for(let c=a;c<=b;c++){ const ref=idxACol(c)+r1; refs.push(ref); claves.push(claveDe(hoja,ref)); } }
+  else if(c1===c2){ const a=Math.min(r1,r2), b=Math.max(r1,r2); for(let r=a;r<=b;r++){ const ref=idxACol(c1)+r; refs.push(ref); claves.push(claveDe(hoja,ref)); } }
+  else return null;
+  return {claves, refs};
+}
+function procRenderCampos(){
+  const spec=window.__stoch.PROC[$('prProc').value];
+  $('prCampos').innerHTML = spec.campos.map(c=>`<div><label>${c[1]}</label><input type="number" step="any" data-p="${c[0]}" value="${c[2]}"></div>`).join('');
+}
+function procAbrirModal(){
+  if(!libro){ mostrarAlertas(['Primero carga un libro de Excel.'],'error'); return; }
+  _procEdit=-1;
+  $('prHoja').innerHTML = libro.hojas.map((h,i)=>`<option value="${escapeHtml(h.nombre)}"${i===hojaActiva?' selected':''}>${escapeHtml(h.nombre)}</option>`).join('');
+  $('prNombre').value=''; $('prRango').value=''; $('prProc').value='gbm'; $('prError').textContent='';
+  procRenderCampos();
+  $('veloProceso').classList.add('visible');
+}
+function procCerrar(){ $('veloProceso').classList.remove('visible'); }
+function procGuardar(){
+  const err=$('prError'); err.textContent='';
+  const hoja=$('prHoja').value, rango=$('prRango').value, proc=$('prProc').value;
+  const nombre=($('prNombre').value||'').trim() || ('Proceso '+(procesos.length+1));
+  const ex=procExpandir(hoja, rango);
+  if(!ex){ err.textContent='Rango inválido. Usa una sola fila o columna, p. ej. B5:G5 o B2:B7.'; return; }
+  if(ex.claves.length<2){ err.textContent='El rango debe tener al menos 2 celdas (2 períodos).'; return; }
+  for(const k of ex.claves){ if(!libro.celdas.has(k)){ err.textContent='La celda '+k+' no existe en el libro (revisa hoja y rango).'; return; } }
+  const usadas=new Set([...entradas.map(e=>e.clave), ...salidas.map(s=>s.clave)]);
+  procesos.forEach((pr,idx)=>{ if(idx!==_procEdit) pr.claves.forEach(k=>usadas.add(k)); });
+  for(const k of ex.claves){ if(usadas.has(k)){ err.textContent='La celda '+k+' ya se usa como entrada, salida u otro proceso.'; return; } }
+  const params={}; for(const inp of $('prCampos').querySelectorAll('input[data-p]')) params[inp.dataset.p]=parseFloat(inp.value);
+  for(const c of window.__stoch.PROC[proc].campos){ if(!isFinite(params[c[0]])){ err.textContent='Completa el parámetro «'+c[1]+'».'; return; } }
+  if((proc==='ou'||proc==='cir') && !(params.theta>0)){ err.textContent='La velocidad de reversión θ debe ser > 0.'; return; }
+  if(params.sigma<0){ err.textContent='La volatilidad σ no puede ser negativa.'; return; }
+  const obj={claves:ex.claves, refs:ex.refs, hoja, nombre, proc, params};
+  if(_procEdit>=0) procesos[_procEdit]=obj; else procesos.push(obj);
+  procCerrar(); procRenderLista();
+}
+function procEliminar(i){ procesos.splice(i,1); procRenderLista(); }
+function procRenderLista(){
+  const cont=$('listaProcesos'); if(!cont) return;
+  const n=$('numProcesos'); if(n) n.textContent=procesos.length?('('+procesos.length+')'):'';
+  if(!procesos.length){ cont.innerHTML='<p style="font-size:.8rem;color:var(--texto2)">Sin procesos definidos.</p>'; return; }
+  cont.innerHTML=procesos.map((pr,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--linea,#eee)"><div><b>${escapeHtml(pr.nombre)}</b><br><span style="font-size:.77rem;color:var(--texto2)">${escapeHtml(pr.hoja)}!${pr.refs[0]}:${pr.refs[pr.refs.length-1]} · ${window.__stoch.PROC[pr.proc].nombre} · ${pr.claves.length} períodos</span></div><button class="btn btn-peligro btn-mini" onclick="procEliminar(${i})">Quitar</button></div>`).join('');
+}
+(function(){
+  const b=$('btnAddProceso'); if(b) b.addEventListener('click', procAbrirModal);
+  const pc=$('prProc'); if(pc) pc.addEventListener('change', procRenderCampos);
+  const pa=$('prAceptar'); if(pa) pa.addEventListener('click', procGuardar);
+  const px=$('prCancelar'); if(px) px.addEventListener('click', procCerrar);
 })();
 </script>
 </body>
