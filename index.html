@@ -175,6 +175,11 @@
 </header>
 
 <main>
+  <nav class="nav-vistas" style="display:flex;gap:8px;max-width:1360px;margin:0 auto 6px;padding:8px 24px 0;flex-wrap:wrap">
+    <button type="button" class="btn btn-primario" id="navSim">📊 Simulador (Excel)</button>
+    <button type="button" class="btn btn-secundario" id="navProc">🎲 Procesos estocásticos</button>
+  </nav>
+  <div id="vistaSimulador">
   <!-- ============ PANTALLA DE CARGA ============ -->
   <section id="pantallaCarga">
     <div class="tarjeta">
@@ -307,6 +312,32 @@
         naranja. Por defecto las entradas se muestrean de forma <b>independiente</b>, pero puedes definir
         <b>correlaciones</b> entre pares en el panel lateral (método Iman-Conover, conserva cada distribución).</p>
       </div>
+    </div>
+  </section>
+  </div><!-- /vistaSimulador -->
+  <section id="vistaProcesos" style="display:none">
+    <div class="tarjeta">
+      <h2 style="margin-top:0">🎲 Procesos estocásticos — simulación de trayectorias</h2>
+      <p class="nota">Simula la evolución en el tiempo de una variable (precio, tasa, inflación, costo…) con procesos clásicos de Monte Carlo. Sirve para explorar y calibrar un proceso antes de usarlo. Herramienta educativa; los supuestos y su interpretación son responsabilidad de quien la usa.</p>
+      <div class="fila"><div style="grid-column:1/-1"><label>Proceso</label>
+        <select id="pcProc">
+          <option value="gbm">Browniano geométrico (GBM) — precios/costos con tendencia</option>
+          <option value="ou">Ornstein-Uhlenbeck — reversión a la media (tasas, inflación)</option>
+          <option value="abm">Browniano aritmético — deriva + ruido</option>
+          <option value="cir">Feller / CIR — reversión positiva (tasas ≥ 0)</option>
+          <option value="puente">Puente browniano — inicio y fin conocidos</option>
+          <option value="merton">Merton — GBM con saltos</option>
+        </select></div></div>
+      <div class="fila c3" id="pcCampos"></div>
+      <div class="fila">
+        <div><label>Horizonte T (años)</label><input type="number" step="any" id="pcT" value="1"></div>
+        <div><label>Pasos</label><input type="number" step="1" id="pcSteps" value="252"></div>
+        <div><label>Nº de trayectorias</label><input type="number" step="1" id="pcN" value="500"></div>
+        <div><label>Semilla (opcional)</label><input type="number" step="1" id="pcSeed" placeholder="Aleatoria"></div>
+      </div>
+      <div id="pcError" style="color:var(--rojo);font-size:.8rem;margin:4px 0"></div>
+      <button class="btn btn-primario" id="pcSimular">▶ Simular trayectorias</button>
+      <div id="pcSalida" style="margin-top:12px"></div>
     </div>
   </section>
 </main>
@@ -2746,6 +2777,91 @@ $('btnEjemploLibro').addEventListener('click', () => {
   mostrarAlertas(['Modelo de ejemplo generado con 3 entradas (verde) y 2 salidas (azul) ya definidas. Pulsa «Ejecutar simulación».'], 'info');
 });
 
+
+/* ============================================================
+   LABORATORIO DE PROCESOS ESTOCASTICOS (anadido 2026-09-02)
+   Vista autonoma; no toca el motor de simulacion de Excel.
+   ============================================================ */
+(function(){
+  const PROC = {
+    gbm:{nombre:'Browniano geométrico (GBM)', campos:[['S0','Valor inicial',100],['mu','Deriva anual μ',0.08],['sigma','Volatilidad anual σ',0.2]]},
+    ou:{nombre:'Ornstein-Uhlenbeck', campos:[['S0','Valor inicial',100],['theta','Velocidad de reversión θ',2],['mu','Media de largo plazo',80],['sigma','Volatilidad σ',15]]},
+    abm:{nombre:'Browniano aritmético', campos:[['S0','Valor inicial',100],['mu','Deriva anual μ',5],['sigma','Volatilidad anual σ',10]]},
+    cir:{nombre:'Feller / CIR', campos:[['S0','Valor inicial',0.05],['theta','Velocidad de reversión θ',1],['mu','Media de largo plazo',0.03],['sigma','Volatilidad σ',0.05]]},
+    puente:{nombre:'Puente browniano', campos:[['S0','Inicio (a)',100],['b','Fin (b)',130],['sigma','Volatilidad σ',20]]},
+    merton:{nombre:'Merton (GBM con saltos)', campos:[['S0','Valor inicial',100],['mu','Deriva anual μ',0.08],['sigma','Volatilidad anual σ',0.2],['lambda','Saltos por año λ',1],['jm','Media del salto (log)',-0.1],['js','Desv. del salto (log)',0.15]]}
+  };
+  function poisson(L,rng){ if(L<=0)return 0; const e=Math.exp(-L); let k=0,p=1; do{ k++; p*=rng(); }while(p>e); return k-1; }
+  function genPath(proc,p,steps,T,rng){
+    const dt=T/steps, sq=Math.sqrt(dt), x=new Float64Array(steps+1); x[0]=p.S0;
+    if(proc==='abm'){ for(let i=1;i<=steps;i++) x[i]=x[i-1]+p.mu*dt+p.sigma*sq*randNormal(rng); }
+    else if(proc==='gbm'){ for(let i=1;i<=steps;i++) x[i]=x[i-1]*Math.exp((p.mu-p.sigma*p.sigma/2)*dt+p.sigma*sq*randNormal(rng)); }
+    else if(proc==='ou'){ const e=Math.exp(-p.theta*dt), sd=p.sigma*Math.sqrt((1-Math.exp(-2*p.theta*dt))/(2*p.theta)); for(let i=1;i<=steps;i++) x[i]=p.mu+(x[i-1]-p.mu)*e+sd*randNormal(rng); }
+    else if(proc==='cir'){ for(let i=1;i<=steps;i++){ const pr=Math.max(x[i-1],0); x[i]=Math.max(0, pr+p.theta*(p.mu-pr)*dt+p.sigma*Math.sqrt(pr)*sq*randNormal(rng)); } }
+    else if(proc==='puente'){ for(let i=1;i<=steps;i++){ const t0=(i-1)*dt; x[i]=x[i-1]+(p.b-x[i-1])/(T-t0)*dt+p.sigma*sq*randNormal(rng); } x[steps]=p.b; }
+    else if(proc==='merton'){ const k=Math.exp(p.jm+p.js*p.js/2)-1, drift=(p.mu-p.lambda*k-p.sigma*p.sigma/2)*dt; for(let i=1;i<=steps;i++){ let v=x[i-1]*Math.exp(drift+p.sigma*sq*randNormal(rng)); const nj=poisson(p.lambda*dt,rng); for(let j=0;j<nj;j++) v*=Math.exp(p.jm+p.js*randNormal(rng)); x[i]=v; } }
+    return x;
+  }
+  function renderCampos(){ const spec=PROC[$('pcProc').value];
+    $('pcCampos').innerHTML = spec.campos.map(function(c){ return '<div><label>'+c[1]+'</label><input type="number" step="any" data-p="'+c[0]+'" value="'+c[2]+'"></div>'; }).join(''); }
+  function leerP(){ const p={}; for(const inp of $('pcCampos').querySelectorAll('input[data-p]')) p[inp.dataset.p]=parseFloat(inp.value); return p; }
+  function estad(arr){ const s=Float64Array.from(arr).sort(); const n=s.length; let m=0; for(let i=0;i<n;i++)m+=s[i]; m/=n; let v=0; for(let i=0;i<n;i++){const d=s[i]-m;v+=d*d;}
+    return {media:m, sd:Math.sqrt(v/n), min:s[0], max:s[n-1], p5:percentil(s,5), p50:percentil(s,50), p95:percentil(s,95)}; }
+  function simular(){
+    const proc=$('pcProc').value, p=leerP(), err=$('pcError'); err.textContent='';
+    const T=parseFloat($('pcT').value), steps=Math.round(parseFloat($('pcSteps').value)), N=Math.round(parseFloat($('pcN').value));
+    if(!(T>0)||!(steps>=1)||!(N>=1)){ err.textContent='Revisa horizonte (>0), pasos (≥1) y nº de trayectorias (≥1).'; return; }
+    if(steps>5000||N>20000){ err.textContent='Máximo 5000 pasos y 20 000 trayectorias.'; return; }
+    for(const c of PROC[proc].campos){ if(!isFinite(p[c[0]])){ err.textContent='Completa el parámetro «'+c[1]+'».'; return; } }
+    if((proc==='ou'||proc==='cir')&&!(p.theta>0)){ err.textContent='La velocidad de reversión θ debe ser > 0.'; return; }
+    if(p.sigma<0){ err.textContent='La volatilidad σ no puede ser negativa.'; return; }
+    const seedTxt=($('pcSeed').value||'').trim(); const seed=seedTxt!==''?Math.round(parseFloat(seedTxt)):((Math.random()*2**31)|0);
+    const rng=mulberry32(seed);
+    const term=new Float64Array(N), acum=new Float64Array(steps+1), muestra=[], nMostrar=Math.min(N,60);
+    for(let n=0;n<N;n++){ const x=genPath(proc,p,steps,T,rng); term[n]=x[steps]; for(let i=0;i<=steps;i++)acum[i]+=x[i]; if(n<nMostrar)muestra.push(x); }
+    for(let i=0;i<=steps;i++)acum[i]/=N;
+    const st=estad(term);
+    const W=800,H=320,td='style="padding:4px 8px;border-bottom:1px solid var(--linea,#e5e9f0);text-align:right"';
+    let html='<canvas id="pcCanvas" width="'+W+'" height="'+H+'" style="width:100%;border:1px solid var(--linea,#e5e9f0);border-radius:8px;background:#fff"></canvas>'+
+      '<p class="nota" style="margin-top:4px"><span style="color:#8fce9c">▬</span> trayectorias (muestra de '+nMostrar+') &nbsp; <span style="color:#1d6b45">▬</span> media &nbsp;·&nbsp; '+PROC[proc].nombre+' · '+fmtNum(N,0)+' trayectorias · semilla '+seed+'</p>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:.85rem;margin-top:6px"><thead><tr>'+
+      '<th style="padding:4px 8px;text-align:left;border-bottom:2px solid var(--linea,#cbd5e1)">Valor final (t=T)</th>'+
+      ['Media','Desv. est.','Mín','P5','P50','P95','Máx'].map(function(h){return '<th style="padding:4px 8px;text-align:right;border-bottom:2px solid var(--linea,#cbd5e1)">'+h+'</th>';}).join('')+
+      '</tr></thead><tbody><tr><td style="padding:4px 8px">Distribución</td>'+
+      [st.media,st.sd,st.min,st.p5,st.p50,st.p95,st.max].map(function(v){return '<td '+td+'>'+fmtNum(v)+'</td>';}).join('')+
+      '</tr></tbody></table>';
+    $('pcSalida').innerHTML=html;
+    // dibujo
+    const cv=$('pcCanvas'), ctx=cv.getContext('2d');
+    let lo=Infinity,hi=-Infinity; muestra.forEach(function(x){ for(let i=0;i<=steps;i++){ if(x[i]<lo)lo=x[i]; if(x[i]>hi)hi=x[i]; } });
+    for(let i=0;i<=steps;i++){ if(acum[i]<lo)lo=acum[i]; if(acum[i]>hi)hi=acum[i]; }
+    if(!(hi>lo)) hi=lo+1;
+    const padL=48,padB=22,padT=8,padR=10;
+    function PX(i){ return padL+(W-padL-padR)*i/steps; }
+    function PY(v){ return H-padB-(H-padB-padT)*(v-lo)/(hi-lo); }
+    ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,padT); ctx.lineTo(padL,H-padB); ctx.lineTo(W-padR,H-padB); ctx.stroke();
+    ctx.lineWidth=0.6; ctx.strokeStyle='rgba(47,158,68,0.30)';
+    muestra.forEach(function(x){ ctx.beginPath(); for(let i=0;i<=steps;i++){ const px=PX(i),py=PY(x[i]); i?ctx.lineTo(px,py):ctx.moveTo(px,py); } ctx.stroke(); });
+    ctx.lineWidth=2; ctx.strokeStyle='#1d6b45'; ctx.beginPath(); for(let i=0;i<=steps;i++){ const px=PX(i),py=PY(acum[i]); i?ctx.lineTo(px,py):ctx.moveTo(px,py); } ctx.stroke();
+    ctx.fillStyle='#5b6b80'; ctx.font='11px Segoe UI'; ctx.textAlign='right';
+    ctx.fillText(fmtNum(hi), padL-4, padT+9); ctx.fillText(fmtNum(lo), padL-4, H-padB);
+    ctx.textAlign='left'; ctx.fillText('t=0', padL, H-6); ctx.textAlign='right'; ctx.fillText('T='+fmtNum(T), W-padR, H-6);
+  }
+  function verProc(v){
+    const vs=$('vistaSimulador'), vp=$('vistaProcesos'); if(!vs||!vp) return;
+    vs.style.display=v?'none':''; vp.style.display=v?'':'none';
+    $('navSim').className='btn '+(v?'btn-secundario':'btn-primario');
+    $('navProc').className='btn '+(v?'btn-primario':'btn-secundario');
+  }
+  const nS=$('navSim'), nP=$('navProc');
+  if(nS&&nP){
+    nS.addEventListener('click',function(){ verProc(false); });
+    nP.addEventListener('click',function(){ verProc(true); if(!$('pcCampos').children.length) renderCampos(); });
+    $('pcProc').addEventListener('change',renderCampos);
+    $('pcSimular').addEventListener('click',simular);
+    renderCampos();
+  }
+})();
 </script>
 </body>
 </html>
