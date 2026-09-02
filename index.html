@@ -229,6 +229,7 @@
         <button class="btn btn-secundario" id="btnRestablecer">Restablecer</button>
         <button class="btn btn-secundario" id="btnCSV" disabled>Exportar CSV</button>
         <button class="btn btn-secundario" id="btnInforme" disabled>Generar informe</button>
+        <button class="btn btn-secundario" id="btnSobol">🌐 Sensibilidad global</button>
       </div>
       <div id="alertas"></div>
       <div class="progreso" id="cajaProgreso"><div class="barra" id="barraProgreso"></div></div>
@@ -344,6 +345,8 @@
           <option value="lognormal">Lognormal</option>
           <option value="pert">PERT (Beta)</option>
           <option value="exponencial">Exponencial</option>
+          <option value="discreta">Discreta (valores y probabilidades)</option>
+          <option value="empirica">Empírica / Bootstrap (datos históricos)</option>
         </select>
       </div>
     </div>
@@ -353,6 +356,15 @@
     </div>
     <div class="fila c3" id="mCampos"></div>
     <div id="mError" style="color:var(--rojo);font-size:.8rem;margin-bottom:6px"></div>
+    <div id="mFitPanel" style="border-top:1px solid var(--linea,#e5e9f0);margin:2px 0 8px;padding-top:8px">
+      <button type="button" class="btn btn-secundario btn-mini" id="mFitToggle">📊 Ajustar a datos históricos…</button>
+      <div id="mFitBody" style="display:none;margin-top:8px">
+        <label style="font-size:.8rem;display:block;margin-bottom:3px">Pega tus datos reales (uno por línea o separados por coma):</label>
+        <textarea id="mFitDatos" rows="4" style="width:100%;font-family:monospace;font-size:13px;resize:vertical" placeholder="Ej. costos o duraciones de obras anteriores…"></textarea>
+        <button type="button" class="btn btn-secundario btn-mini" id="mFitAjustar" style="margin-top:4px">Ajustar y comparar</button>
+        <div id="mFitResultados" style="margin-top:8px;font-size:.82rem"></div>
+      </div>
+    </div>
     <div class="acciones-modal">
       <button class="btn btn-secundario" id="mCancelar">Cancelar</button>
       <button class="btn btn-primario" id="mAceptar">Aceptar</button>
@@ -1373,6 +1385,31 @@ const DISTS = {
     rango: p => [0, p.media * 5],
     pdf: (p, x) => x < 0 ? 0 : Math.exp(-x/p.media)/p.media,
     resumen: p => `media=${fmtNum(p.media)}`
+  },
+  discreta: {
+    nombre: 'Discreta (valores y probabilidades)',
+    campos: [['vals','Valores posibles (uno por línea)','lista'],['pesos','Probabilidades o pesos (opcional, uno por línea)','lista']],
+    porDefecto: v => ({ vals:[v*0.9||-1, v||0, v*1.1||1], pesos:[] }),
+    validar: p => (!p.vals || p.vals.length < 1 || !p.vals.every(isFinite)) ? 'Indica al menos un valor numérico.' :
+      (p.pesos && p.pesos.length && (p.pesos.length !== p.vals.length || !p.pesos.every(w => isFinite(w) && w >= 0) || p.pesos.reduce((a,b)=>a+b,0) <= 0)) ? 'Si pones pesos deben ser tantos como valores, no negativos y con suma > 0.' : null,
+    muestra: (p, rng) => { const d = discPairs(p), u = rng(); for (const par of d){ if (u <= par[1]) return par[0]; } return d[d.length-1][0]; },
+    mediaT: p => { const d = discPairs(p); let m=0, prev=0; for (const par of d){ m += par[0]*(par[1]-prev); prev=par[1]; } return m; },
+    sdT: p => { const d = discPairs(p), mu = DISTS.discreta.mediaT(p); let s=0, prev=0; for (const par of d){ s += (par[0]-mu)*(par[0]-mu)*(par[1]-prev); prev=par[1]; } return Math.sqrt(s); },
+    rango: p => [p.vals.reduce((a,b)=>Math.min(a,b),Infinity), p.vals.reduce((a,b)=>Math.max(a,b),-Infinity)],
+    pdf: (p, x) => { const d = discPairs(p); const lo=d[0][0], hi=d[d.length-1][0]; const bw=Math.max((hi-lo)/Math.max(d.length,10),1e-9); let s=0, prev=0; for (const par of d){ if (Math.abs(par[0]-x) <= bw/2) s += (par[1]-prev); prev=par[1]; } return s/bw; },
+    resumen: p => `${p.vals ? p.vals.length : 0} valores`
+  },
+  empirica: {
+    nombre: 'Empírica / Bootstrap (datos históricos)',
+    campos: [['datos','Datos históricos (uno por línea)','lista']],
+    porDefecto: v => ({ datos:[v*0.9||-1, v||0, v*1.1||1] }),
+    validar: p => (!p.datos || p.datos.length < 2 || !p.datos.every(isFinite)) ? 'Pega al menos 2 datos numéricos (uno por línea).' : null,
+    muestra: (p, rng) => p.datos[(rng()*p.datos.length)|0],
+    mediaT: p => p.datos.reduce((a,b)=>a+b,0)/p.datos.length,
+    sdT: p => { const m = DISTS.empirica.mediaT(p); return Math.sqrt(p.datos.reduce((a,b)=>a+(b-m)*(b-m),0)/p.datos.length); },
+    rango: p => [p.datos.reduce((a,b)=>Math.min(a,b),Infinity), p.datos.reduce((a,b)=>Math.max(a,b),-Infinity)],
+    pdf: (p, x) => { const s = sortedOf(p.datos); const lo=s[0], hi=s[s.length-1]; const bw=Math.max((hi-lo)/20,1e-9); let c=0; for (let i=0;i<s.length;i++) if (Math.abs(s[i]-x) <= bw/2) c++; return c/(s.length*bw); },
+    resumen: p => `${p.datos ? p.datos.length : 0} datos`
   }
 };
 
@@ -1427,6 +1464,19 @@ const ICDF = {
   lognormal:   (p,u)=>{ const s2=Math.log(1+(p.sd*p.sd)/(p.media*p.media)), mu=Math.log(p.media)-s2/2; return Math.exp(mu+Math.sqrt(s2)*invNorm(u)); },
   pert:        (p,u)=>{ const al=1+4*(p.moda-p.min)/(p.max-p.min), be=1+4*(p.max-p.moda)/(p.max-p.min); return p.min+(p.max-p.min)*invBetainc(u,al,be); }
 };
+/* ICDF y muestreo para distribuciones basadas en datos (discreta/empirica) */
+const _sortCache = new WeakMap();
+function sortedOf(arr){ let s = _sortCache.get(arr); if (!s){ s = Float64Array.from(arr).sort(); _sortCache.set(arr, s); } return s; }
+const _discCache = new WeakMap();
+function discPairs(p){ let d = _discCache.get(p); if (d) return d;
+  const vals = p.vals, w = (p.pesos && p.pesos.length === vals.length) ? p.pesos : vals.map(() => 1);
+  const idx = vals.map((v,i)=>i).sort((a,b)=>vals[a]-vals[b]);
+  const wsum = w.reduce((a,b)=>a+b,0) || 1; let acc = 0; d = [];
+  for (const i of idx){ acc += w[i]/wsum; d.push([vals[i], acc]); }
+  _discCache.set(p, d); return d;
+}
+ICDF.discreta = (p,u) => { const d = discPairs(p); for (const par of d){ if (u <= par[1]) return par[0]; } return d[d.length-1][0]; };
+ICDF.empirica = (p,u) => { const s = sortedOf(p.datos), n = s.length; if (n === 1) return s[0]; const q = u*(n-1); const lo = Math.floor(q), fr = q-lo; return lo >= n-1 ? s[n-1] : s[lo] + (s[lo+1]-s[lo])*fr; };
 /* N muestras por Hipercubo Latino: un estrato por muestra + barajado (Fisher-Yates).
    Se conserva la marginal exacta y es compatible con la correlacion Iman-Conover (que reordena despues). */
 function muestrasLHS(fn, params, N, rng){
@@ -1729,19 +1779,26 @@ function abrirModal(clave){
   $('mNombre').value = existente ? existente.nombre : nombreSugerido({ hoja: hojaN, ref: refN, col: c ? c.col : colAIdx(/^[A-Z]+/.exec(refN)[0]), fila: parseInt(/[0-9]+$/.exec(refN)[0]) });
   $('mDist').value = dist;
   $('mError').textContent = '';
+  if ($('mFitBody')){ $('mFitBody').style.display='none'; $('mFitDatos').value=''; $('mFitResultados').innerHTML=''; }
   renderCamposModal(dist, params);
   $('veloModal').classList.add('visible');
 }
 function renderCamposModal(dist, params){
   const d = DISTS[dist];
-  $('mCampos').innerHTML = d.campos.map(([k, et]) =>
-    `<div><label>${et}</label><input type="number" step="any" data-param="${k}" value="${isFinite(params[k]) ? params[k] : ''}"></div>`).join('');
+  $('mCampos').innerHTML = d.campos.map(([k, et, tipo]) =>
+    tipo === 'lista'
+      ? `<div style="grid-column:1/-1"><label>${et}</label><textarea data-param="${k}" data-tipo="lista" rows="5" style="width:100%;font-family:monospace;font-size:13px;resize:vertical" placeholder="Un número por línea">${Array.isArray(params[k]) ? params[k].join('\n') : ''}</textarea></div>`
+      : `<div><label>${et}</label><input type="number" step="any" data-param="${k}" value="${isFinite(params[k]) ? params[k] : ''}"></div>`).join('');
   actualizarVistaDist();
 }
 function leerParamsModal(){
   const p = {};
-  for (const inp of $('mCampos').querySelectorAll('input[data-param]'))
-    p[inp.dataset.param] = parseFloat(inp.value);
+  for (const inp of $('mCampos').querySelectorAll('[data-param]')){
+    if (inp.dataset.tipo === 'lista')
+      p[inp.dataset.param] = inp.value.split(/[\s,;]+/).map(parseFloat).filter(v => isFinite(v));
+    else
+      p[inp.dataset.param] = parseFloat(inp.value);
+  }
   return p;
 }
 function actualizarVistaDist(){
@@ -1787,6 +1844,51 @@ $('mDist').addEventListener('change', () => {
   renderCamposModal($('mDist').value, DISTS[$('mDist').value].porDefecto(valorBase));
 });
 $('mCampos').addEventListener('input', actualizarVistaDist);
+/* ===== Ajuste de distribucion a datos historicos (estadistico K-S) ===== */
+function erf(x){ const t=1/(1+0.3275911*Math.abs(x)); const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x); return x>=0?y:-y; }
+function normCdf(z){ return 0.5*(1+erf(z/Math.SQRT2)); }
+const CDF = {
+  normal:(p,x)=> normCdf((x-p.media)/p.sd),
+  lognormal:(p,x)=>{ if(x<=0)return 0; const s2=Math.log(1+(p.sd*p.sd)/(p.media*p.media)), mu=Math.log(p.media)-s2/2; return normCdf((Math.log(x)-mu)/Math.sqrt(s2)); },
+  uniforme:(p,x)=> x<=p.min?0:x>=p.max?1:(x-p.min)/(p.max-p.min),
+  exponencial:(p,x)=> x<=0?0:1-Math.exp(-x/p.media),
+  triangular:(p,x)=>{ if(x<=p.min)return 0; if(x>=p.max)return 1; return x<p.moda ? (x-p.min)*(x-p.min)/((p.max-p.min)*(p.moda-p.min)) : 1-(p.max-x)*(p.max-x)/((p.max-p.min)*(p.max-p.moda)); },
+  pert:(p,x)=>{ if(x<=p.min)return 0; if(x>=p.max)return 1; const al=1+4*(p.moda-p.min)/(p.max-p.min), be=1+4*(p.max-p.moda)/(p.max-p.min); return betainc((x-p.min)/(p.max-p.min),al,be); }
+};
+function ksStat(datos, dist, params){ const s=Float64Array.from(datos).sort(); const n=s.length; let d=0; for(let i=0;i<n;i++){ const F=CDF[dist](params,s[i]); d=Math.max(d, Math.abs((i+1)/n-F), Math.abs(F-i/n)); } return d; }
+function ajustarDistribuciones(datos){
+  const n=datos.length, mean=datos.reduce((a,b)=>a+b,0)/n;
+  const varr=datos.reduce((a,b)=>a+(b-mean)*(b-mean),0)/n, sd=Math.sqrt(varr);
+  const mn=datos.reduce((a,b)=>Math.min(a,b),Infinity), mx=datos.reduce((a,b)=>Math.max(a,b),-Infinity);
+  const rng=(mx>mn)?mx:mn+1; const cands=[];
+  cands.push({dist:'normal', params:{media:mean, sd:sd||1}});
+  cands.push({dist:'uniforme', params:{min:mn, max:rng}});
+  { let moda=3*mean-mn-mx; moda=Math.max(mn,Math.min(mx,moda)); cands.push({dist:'triangular', params:{min:mn, moda:moda, max:rng}}); }
+  { let moda=(6*mean-mn-mx)/4; moda=Math.max(mn,Math.min(mx,moda)); cands.push({dist:'pert', params:{min:mn, moda:moda, max:rng}}); }
+  if(mn>0) cands.push({dist:'lognormal', params:{media:mean, sd:sd||mean*0.1}});
+  if(mn>=0) cands.push({dist:'exponencial', params:{media:mean||1}});
+  cands.forEach(c=>{ c.ks=ksStat(datos,c.dist,c.params); c.nombre=DISTS[c.dist].nombre; });
+  cands.sort((a,b)=>a.ks-b.ks); return cands;
+}
+(function(){
+  const tgl=$('mFitToggle'), body=$('mFitBody'), btn=$('mFitAjustar');
+  if(!tgl) return;
+  tgl.addEventListener('click', function(){ body.style.display = body.style.display==='none' ? '' : 'none'; });
+  btn.addEventListener('click', function(){
+    const datos = ($('mFitDatos').value||'').split(/[\s,;]+/).map(parseFloat).filter(v=>isFinite(v));
+    const out=$('mFitResultados');
+    if(datos.length<5){ out.innerHTML='<span style="color:var(--rojo)">Pega al menos 5 datos numéricos.</span>'; return; }
+    const cands=ajustarDistribuciones(datos);
+    out.innerHTML='<div style="margin-bottom:4px">Ordenado por parecido a tus datos (distancia K-S menor = mejor). Haz clic para usar:</div>'+
+      cands.map(function(c,i){ return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid var(--linea,#eee)">'+
+        '<button type="button" class="btn btn-secundario btn-mini fit-usar" data-i="'+i+'">'+(i===0?'★ ':'')+c.nombre+'</button>'+
+        '<span style="color:var(--gris,#667)">K-S='+c.ks.toFixed(3)+' · '+DISTS[c.dist].resumen(c.params)+'</span></div>'; }).join('')+
+      '<div style="color:var(--gris,#667);margin-top:4px;font-size:.76rem">Nota: PERT y Lognormal son flexibles y suelen dar K-S bajo aunque tus datos vengan de otra forma; usa tu criterio de ingeniería.</div>';
+    out.querySelectorAll('.fit-usar').forEach(function(b){ b.addEventListener('click', function(){
+      const c=cands[+b.dataset.i]; $('mDist').value=c.dist; renderCamposModal(c.dist, c.params); body.style.display='none';
+    }); });
+  });
+})();
 $('mCancelar').addEventListener('click', () => $('veloModal').classList.remove('visible'));
 $('veloModal').addEventListener('click', e => { if (e.target === $('veloModal')) $('veloModal').classList.remove('visible'); });
 $('mAceptar').addEventListener('click', () => {
@@ -1851,6 +1953,73 @@ function cadenaAfectada(clavesInicio){
   return libro.ordenTopo.filter(k => afectadas.has(k)).map(k => libro.celdas.get(k));
 }
 function ordenAfectado(){ return cadenaAfectada(entradas.map(e => e.clave)); }
+/* ===== Sensibilidad global: indices de Sobol (Saltelli 2010 primer orden + Jansen total) ===== */
+function evalModeloSobol(vals, celdasEnt, cadena, celdasSal){
+  for (let k=0;k<celdasEnt.length;k++) if (celdasEnt[k]) celdasEnt[k].valor = vals[k];
+  for (const c of cadena){ try{ c.valor = evaluar(c.ast, c.hoja); }catch(e){ c.valor = NaN; } }
+  return celdasSal.map(c => { const v = c ? c.valor : NaN; return (typeof v==='number' && isFinite(v)) ? v : NaN; });
+}
+function correrSobol(N){
+  if (typeof libro==='undefined' || !libro || !entradas.length || !salidas.length) return {error:'Carga un libro y define al menos una entrada y una salida.'};
+  const K=entradas.length, Sn=salidas.length;
+  const cadena=ordenAfectado();
+  const celdasEnt=entradas.map(e=>libro.celdas.get(e.clave));
+  const celdasSal=salidas.map(s=>libro.celdas.get(s.clave));
+  const rng=mulberry32((Math.random()*2**31)|0);
+  const A=[],B=[];
+  for (let i=0;i<N;i++){ A.push(entradas.map(e=>DISTS[e.dist].muestra(e.params,rng))); B.push(entradas.map(e=>DISTS[e.dist].muestra(e.params,rng))); }
+  const yA=A.map(v=>evalModeloSobol(v,celdasEnt,cadena,celdasSal));
+  const yB=B.map(v=>evalModeloSobol(v,celdasEnt,cadena,celdasSal));
+  const meanY=new Array(Sn).fill(0), cA=new Array(Sn).fill(0);
+  for (let j=0;j<N;j++) for (let s=0;s<Sn;s++){ if (isFinite(yA[j][s])){ meanY[s]+=yA[j][s]; cA[s]++; } }
+  for (let s=0;s<Sn;s++) meanY[s] /= (cA[s]||1);
+  const varY=new Array(Sn).fill(0);
+  for (let j=0;j<N;j++) for (let s=0;s<Sn;s++){ if (isFinite(yA[j][s])){ const d=yA[j][s]-meanY[s]; varY[s]+=d*d; } }
+  for (let s=0;s<Sn;s++) varY[s] /= ((cA[s]-1)||1);
+  const res=salidas.map(()=>({S:new Array(K).fill(0), ST:new Array(K).fill(0)}));
+  for (let k=0;k<K;k++){
+    const sf=new Array(Sn).fill(0), st=new Array(Sn).fill(0), cnt=new Array(Sn).fill(0);
+    for (let j=0;j<N;j++){ const row=A[j].slice(); row[k]=B[j][k]; const yab=evalModeloSobol(row,celdasEnt,cadena,celdasSal);
+      for (let s=0;s<Sn;s++){ if (!isFinite(yab[s])||!isFinite(yA[j][s])||!isFinite(yB[j][s])) continue;
+        sf[s]+=(yB[j][s]-meanY[s])*(yab[s]-yA[j][s]); const d=yA[j][s]-yab[s]; st[s]+=d*d; cnt[s]++; } }
+    for (let s=0;s<Sn;s++){ res[s].S[k]=(varY[s]>0&&cnt[s])?(sf[s]/cnt[s])/varY[s]:0; res[s].ST[k]=(varY[s]>0&&cnt[s])?(st[s]/(2*cnt[s]))/varY[s]:0; }
+  }
+  for (const c of celdasEnt) if (c) c.valor=c.valorOriginal;
+  for (const c of cadena) c.valor=c.valorOriginal;
+  return {K,Sn,res,varY,N};
+}
+function renderSobol(N){
+  const out=$('panelResultados');
+  const hayCorr = Object.keys(correlaciones||{}).length>0;
+  const r=correrSobol(N);
+  if (r.error){ mostrarAlertas([r.error],'error'); return; }
+  let html='<h2>🌐 Sensibilidad global — índices de Sobol ('+fmtNum(r.N,0)+' × ('+r.K+'+2) = '+fmtNum(r.N*(r.K+2),0)+' evaluaciones)</h2>';
+  if (hayCorr) html+='<div class="alerta aviso">Los índices de Sobol suponen entradas independientes; como tienes correlaciones definidas, tómalos como orientativos.</div>';
+  html+='<p class="nota">S₁ (primer orden) = cuánto explica cada entrada por sí sola. Sₜ (total) = incluye sus interacciones con otras. Si Sₜ es bastante mayor que S₁, esa entrada actúa combinada. ΣS₁ ≈ 100% indica un modelo casi aditivo.</p>';
+  const thtd='style="padding:4px 8px;border-bottom:1px solid var(--linea,#e5e9f0);text-align:right"';
+  salidas.forEach((sal,s)=>{
+    const R=r.res[s]; const idx=entradas.map((e,i)=>i).sort((a,b)=>R.ST[b]-R.ST[a]);
+    let sumS=0; R.S.forEach(v=>sumS+=Math.max(0,v));
+    html+='<h3>'+escapeHtml(sal.nombre)+'</h3><table style="width:100%;border-collapse:collapse;font-size:.85rem"><thead><tr>'+
+      '<th style="padding:4px 8px;text-align:left;border-bottom:2px solid var(--linea,#cbd5e1)">Entrada</th>'+
+      '<th '+thtd.replace('border-bottom:1px','border-bottom:2px')+'>S₁ (primer orden)</th>'+
+      '<th '+thtd.replace('border-bottom:1px','border-bottom:2px')+'>Sₜ (total)</th>'+
+      '<th '+thtd.replace('border-bottom:1px','border-bottom:2px')+'>Interacción</th></tr></thead><tbody>';
+    idx.forEach(i=>{ const S1=Math.max(0,R.S[i]), STt=Math.max(0,R.ST[i]); const inter=STt-S1;
+      html+='<tr><td style="padding:4px 8px;border-bottom:1px solid var(--linea,#e5e9f0)">'+escapeHtml(entradas[i].nombre)+'</td>'+
+        '<td '+thtd+'>'+fmtPct(S1,1)+'</td><td '+thtd+'>'+fmtPct(STt,1)+'</td><td '+thtd+'>'+(inter>0.05?fmtPct(inter,1)+' ⚠':'—')+'</td></tr>'; });
+    html+='</tbody></table><p class="nota">Suma de S₁ = '+fmtPct(sumS,1)+(sumS<0.9?' — hay interacciones relevantes entre entradas.':' — modelo casi aditivo.')+'</p>';
+  });
+  out.innerHTML=html; out.scrollIntoView({behavior:'smooth',block:'start'});
+}
+(function(){
+  const btn=$('btnSobol'); if(!btn) return;
+  btn.addEventListener('click', function(){
+    if (typeof libro==='undefined'||!libro||!entradas.length||!salidas.length){ mostrarAlertas(['Carga un libro y define al menos una entrada y una salida antes de calcular Sobol.'],'error'); return; }
+    const N=800; btn.disabled=true; const t=btn.textContent; btn.textContent='⏳ Calculando…';
+    setTimeout(function(){ try{ renderSobol(N); } catch(e){ mostrarAlertas(['Error en Sobol: '+e.message],'error'); } finally{ btn.disabled=false; btn.textContent=t; } }, 20);
+  });
+})();
 /* Punto de equilibrio: valor de una entrada que hace salida = objetivo (Buscar objetivo de Excel).
    Bisección sobre el motor de fórmulas; las demás celdas quedan en su valor base. */
 function puntoEquilibrio(claveSalida, claveVariar, objetivo){
