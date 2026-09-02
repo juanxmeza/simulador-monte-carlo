@@ -178,6 +178,7 @@
   <nav class="nav-vistas" style="display:flex;gap:8px;max-width:1360px;margin:0 auto 6px;padding:8px 24px 0;flex-wrap:wrap">
     <button type="button" class="btn btn-primario" id="navSim">📊 Simulador (Excel)</button>
     <button type="button" class="btn btn-secundario" id="navProc">🎲 Procesos estocásticos</button>
+    <button type="button" class="btn btn-secundario" id="navMan">📖 Manual</button>
   </nav>
   <div id="vistaSimulador">
   <!-- ============ PANTALLA DE CARGA ============ -->
@@ -343,6 +344,155 @@
       <div id="pcError" style="color:var(--rojo);font-size:.8rem;margin:4px 0"></div>
       <button class="btn btn-primario" id="pcSimular">▶ Simular trayectorias</button>
       <div id="pcSalida" style="margin-top:12px"></div>
+    </div>
+  </section>
+  <section id="vistaManual" style="display:none">
+    <style>
+      #vistaManual .manual-doc{max-width:900px;margin:0 auto}
+      #vistaManual h2{font-size:1.3rem;margin:1.6em 0 .5em;border-bottom:2px solid var(--verde,#2f9e44);padding-bottom:5px}
+      #vistaManual h3{font-size:1.05rem;color:var(--verde,#1d6b45);margin:1.1em 0 .3em}
+      #vistaManual p, #vistaManual li{line-height:1.6}
+      #vistaManual ol, #vistaManual ul{padding-left:22px;margin:.4em 0}
+      #vistaManual li{margin:.25em 0}
+      #vistaManual code{background:var(--surface-2,#eef2f7);padding:1px 6px;border-radius:4px;font-size:.92em}
+      #vistaManual .toc{background:var(--surface-2,#f1f5f9);border-radius:10px;padding:12px 18px;columns:2;font-size:.9rem}
+      #vistaManual .toc a{color:var(--acento,#2f6fed);text-decoration:none}
+      #vistaManual .nota-m{background:#eef4ff;border-left:3px solid #2f6fed;padding:8px 12px;border-radius:6px;margin:.6em 0;font-size:.93em}
+      @media print{ body>header, .nav-vistas, #vistaSimulador, #vistaProcesos, footer, #manualBtns{ display:none !important } #vistaManual{ display:block !important } }
+    </style>
+    <div class="tarjeta manual-doc">
+      <div id="manualBtns" style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn btn-secundario btn-mini" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+        <button class="btn btn-secundario btn-mini" id="btnDescargarManual">⬇️ Descargar manual (HTML)</button>
+      </div>
+      <div id="manualContenido">
+      <h1 style="margin-top:0">📖 Manual del Simulador de Riesgos Monte Carlo</h1>
+      <p>Guía práctica para usar cada función de la herramienta. No necesitas saber programar: se trabaja sobre tu propio archivo de Excel, marcando celdas y leyendo resultados.</p>
+
+      <div class="toc">
+        <a href="#m1">1. Qué es y para qué sirve</a><br>
+        <a href="#m2">2. Primeros pasos: cargar tu Excel</a><br>
+        <a href="#m3">3. Definir entradas (supuestos)</a><br>
+        <a href="#m4">4. Las distribuciones disponibles</a><br>
+        <a href="#m5">5. Ajustar una distribución a datos</a><br>
+        <a href="#m6">6. Definir salidas (pronósticos)</a><br>
+        <a href="#m7">7. Correlación entre entradas</a><br>
+        <a href="#m8">8. Entradas de proceso (serie temporal)</a><br>
+        <a href="#m9">9. Configurar y ejecutar</a><br>
+        <a href="#m10">10. Interpretar los resultados</a><br>
+        <a href="#m11">11. Tornado (sensibilidad)</a><br>
+        <a href="#m12">12. Punto de equilibrio</a><br>
+        <a href="#m13">13. Sensibilidad global (Sobol)</a><br>
+        <a href="#m14">14. Laboratorio de procesos</a><br>
+        <a href="#m15">15. Exportar (CSV e informe)</a><br>
+        <a href="#m16">16. Limitaciones y buenas prácticas</a>
+      </div>
+
+      <h2 id="m1">1. Qué es y para qué sirve</h2>
+      <p>En lugar de calcular tu modelo de Excel una sola vez con valores fijos, el simulador lo recalcula <b>miles de veces</b>, tomando en cada repetición valores al azar de las celdas inciertas según la distribución que les asignes. El resultado no es un número, sino una <b>distribución</b>: te dice qué valores puede tomar cada salida y con qué probabilidad. Sirve para <b>comparar alternativas y dimensionar reservas/contingencias</b>, no para predecir un valor exacto.</p>
+
+      <h2 id="m2">2. Primeros pasos: cargar tu Excel</h2>
+      <ol>
+        <li>Abre la app. Verás tres pestañas arriba: <b>📊 Simulador (Excel)</b>, <b>🎲 Procesos estocásticos</b> y <b>📖 Manual</b>. Empieza en la primera.</li>
+        <li>Arrastra tu archivo <code>.xlsx</code> a la zona de carga, o haz clic para seleccionarlo. Si no tienes uno, pulsa <b>«🧪 Genera un modelo de ejemplo»</b> para practicar.</li>
+        <li>El archivo se procesa <b>en tu navegador</b>: no se sube a ningún servidor.</li>
+      </ol>
+      <div class="nota-m">Si tu archivo es <code>.xls</code> antiguo, ábrelo en Excel y guárdalo como <code>.xlsx</code>.</div>
+
+      <h2 id="m3">3. Definir entradas (supuestos)</h2>
+      <p>Una <b>entrada</b> es una celda incierta a la que le pones una distribución de probabilidad.</p>
+      <ol>
+        <li>Haz clic en la celda en la hoja (debe tener un <b>valor</b>, no una fórmula).</li>
+        <li>Pulsa <b>«🟢 Definir como entrada»</b>. Se abre la ventana de <i>Propiedades</i>.</li>
+        <li>Ponle un <b>nombre</b>, elige la <b>distribución</b> y completa sus parámetros. La vista previa te muestra la forma de la curva y su media/desviación teóricas.</li>
+        <li>Acepta. La celda queda marcada en verde y aparece en la lista <b>🟢 Entradas</b>.</li>
+      </ol>
+
+      <h2 id="m4">4. Las distribuciones disponibles</h2>
+      <ul>
+        <li><b>Normal</b> — variables simétricas alrededor de una media (errores de medición, rendimientos). Parámetros: media y desviación.</li>
+        <li><b>Triangular</b> — cuando solo conoces mínimo, valor más probable y máximo. Muy usada en costos y duraciones.</li>
+        <li><b>PERT (Beta)</b> — como la triangular pero más suave y realista; da más peso al valor más probable. La preferida en estimación de obra.</li>
+        <li><b>Uniforme</b> — cualquier valor entre un mínimo y un máximo es igual de probable (máxima incertidumbre).</li>
+        <li><b>Lognormal</b> — valores que no pueden ser negativos y con cola hacia la derecha (precios, algunos costos).</li>
+        <li><b>Exponencial</b> — tiempos entre eventos, vida útil sencilla.</li>
+        <li><b>Discreta</b> — escenarios con valores y probabilidades concretos (p. ej. 70&nbsp;% → 100, 30&nbsp;% → 150).</li>
+        <li><b>Empírica / Bootstrap</b> — muestrea directamente de una lista de <b>datos históricos</b> reales, sin suponer ninguna forma. La opción más fiel si tu historial representa bien el futuro.</li>
+      </ul>
+      <div class="nota-m">Para Discreta y Empírica pegas una <b>lista</b> de números (uno por línea) en el recuadro de la ventana.</div>
+
+      <h2 id="m5">5. Ajustar una distribución a datos históricos</h2>
+      <p>Si tienes datos reales y no sabes qué distribución usar, la app te la sugiere:</p>
+      <ol>
+        <li>En la ventana de <i>Propiedades</i> de una entrada, pulsa <b>«📊 Ajustar a datos históricos…»</b>.</li>
+        <li>Pega tus datos (mínimo 5) y pulsa <b>«Ajustar y comparar»</b>.</li>
+        <li>La app compara 6 distribuciones por la <b>distancia Kolmogorov-Smirnov (K-S)</b> y las ordena: <b>menor K-S = se parece más</b>. La mejor lleva una ★.</li>
+        <li>Haz clic en la que prefieras y se aplica con sus parámetros ya calculados.</li>
+      </ol>
+      <div class="nota-m"><b>Ojo:</b> PERT y Lognormal son muy flexibles y a veces salen primeras aunque tus datos vengan de otra forma. Usa el K-S como orientación, no como veredicto: aplica tu criterio (p. ej. si un costo no puede ser negativo, prefiere Lognormal/PERT/Triangular).</div>
+
+      <h2 id="m6">6. Definir salidas (pronósticos)</h2>
+      <p>Una <b>salida</b> es la celda cuyo resultado quieres analizar (utilidad, costo total, TIR…). Debe contener una <b>fórmula</b> que dependa de tus entradas.</p>
+      <ol>
+        <li>Haz clic en esa celda y pulsa <b>«🔵 Definir como salida»</b>. Queda marcada en azul y aparece en la lista <b>🔵 Salidas</b>.</li>
+      </ol>
+
+      <h2 id="m7">7. Correlación entre entradas</h2>
+      <p>Por defecto las entradas se sortean de forma <b>independiente</b>. Si dos variables se mueven juntas (p. ej. cuando sube el precio del acero también sube el del concreto), puedes definir su <b>correlación</b> en el panel <b>🔗 Correlaciones</b>, indicando un coeficiente entre −1 y 1. La app usa el método <b>Iman-Conover</b>, que induce la correlación <b>conservando cada distribución individual</b>.</p>
+
+      <h2 id="m8">8. Entradas de proceso (serie temporal)</h2>
+      <p>Cuando una variable <b>evoluciona en el tiempo</b> (una tasa, la inflación, un precio a lo largo de varios años), no tiene sentido sortear cada año de forma independiente. Una <b>entrada de proceso</b> asigna un proceso estocástico a un <b>rango</b> de celdas (una fila o columna = períodos): en cada iteración genera <b>una trayectoria coherente</b> y rellena todo el rango.</p>
+      <ol>
+        <li>En el panel derecho, tarjeta <b>🌊 Entradas de proceso</b>, pulsa <b>«➕ Añadir entrada de proceso»</b>.</li>
+        <li>Indica la <b>hoja</b>, el <b>rango</b> (p. ej. <code>B5:G5</code> para una fila, o <code>B2:B7</code> para una columna), el <b>proceso</b> y sus <b>parámetros por período</b>.</li>
+        <li>Guarda. En cada iteración esa fila/columna se llenará con un camino realista.</li>
+      </ol>
+      <p>Procesos disponibles: <b>GBM</b> (precios/costos con tendencia), <b>Ornstein-Uhlenbeck</b> (reversión a la media: tasas, inflación), <b>Browniano aritmético</b>, <b>Feller/CIR</b> (reversión positiva), <b>Puente browniano</b> (inicio y fin conocidos) y <b>Merton</b> (con saltos). Cada celda representa un período; <code>S0</code> es el valor de partida.</p>
+
+      <h2 id="m9">9. Configurar y ejecutar</h2>
+      <ul>
+        <li><b>Iteraciones</b>: cuántas veces se recalcula el modelo (1.000–50.000, o manual). Más iteraciones = resultados más estables.</li>
+        <li><b>Muestreo</b>: <b>Hipercubo Latino</b> (por defecto, converge mejor con las mismas iteraciones) o <b>Aleatorio simple</b>.</li>
+        <li><b>Semilla</b> (opcional): fija un número para obtener siempre el mismo resultado (reproducible); déjala vacía para que sea aleatoria.</li>
+        <li>Pulsa <b>«▶ Ejecutar simulación»</b>.</li>
+      </ul>
+
+      <h2 id="m10">10. Interpretar los resultados</h2>
+      <ul>
+        <li><b>Media, P10, P50, P90, Desv. estándar</b>: el P10 es el valor bajo el cual queda el 10&nbsp;% de los casos; el P50 es la mediana; el P90 deja el 90&nbsp;% por debajo. Cuanto más separados P10 y P90, mayor la incertidumbre.</li>
+        <li><b>Histograma</b>: la forma de la distribución de la salida.</li>
+        <li><b>Curva de probabilidad acumulada (CDF)</b>: para cada valor, el porcentaje de casos con resultado igual o menor.</li>
+        <li><b>Certeza</b>: escribe un rango («desde / hasta») y te dice la <b>probabilidad</b> de que el resultado caiga ahí.</li>
+        <li><b>Indicador de fiabilidad</b>: el error relativo de la media; si baja del 0,1&nbsp;% el resultado es estable y casi no depende de la semilla (criterio de Sapag).</li>
+      </ul>
+
+      <h2 id="m11">11. Tornado (sensibilidad)</h2>
+      <p>El <b>tornado</b> ordena las entradas por cuánto <b>impulsan la variabilidad</b> de la salida (correlación de rangos de Spearman). Barra positiva = al subir la entrada sube la salida; negativa = la baja. El <b>%</b> es la contribución relativa (regla de Pareto 80/20: concéntrate en las barras más grandes). <b>Las entradas de proceso también aparecen aquí.</b></p>
+
+      <h2 id="m12">12. Punto de equilibrio (buscar objetivo)</h2>
+      <p>En el bloque <b>🎯 Punto de equilibrio</b> eliges una entrada y la app calcula qué valor de esa entrada lleva la salida a un objetivo (por defecto 0), con las demás en su valor base. La <b>«holgura»</b> es cuánto puede moverse esa entrada antes de cruzar el objetivo. Equivale al «Buscar objetivo» de Excel.</p>
+
+      <h2 id="m13">13. Sensibilidad global (Sobol)</h2>
+      <p>El botón <b>«🌐 Sensibilidad global»</b> calcula los <b>índices de Sobol</b>: <b>S₁</b> (primer orden) mide cuánto explica cada entrada <b>por sí sola</b>; <b>Sₜ</b> (total) incluye sus <b>interacciones</b> con otras. Si Sₜ es bastante mayor que S₁, esa entrada actúa combinada. Si ΣS₁ ≈ 100&nbsp;%, el modelo es casi aditivo. Es más completo que el tornado, pero tarda más (hace (K+2)×N evaluaciones).</p>
+
+      <h2 id="m14">14. Laboratorio de procesos estocásticos</h2>
+      <p>La pestaña <b>🎲 Procesos estocásticos</b> es un banco de pruebas: eliges un proceso (GBM, Ornstein-Uhlenbeck, etc.), sus parámetros, el horizonte y el número de trayectorias, y ves el <b>gráfico de caminos + la media</b> y las <b>estadísticas del valor final</b>. Úsalo para <b>explorar y calibrar</b> un proceso antes de usarlo como «entrada de proceso» en tu modelo.</p>
+
+      <h2 id="m15">15. Exportar (CSV e informe)</h2>
+      <ul>
+        <li><b>Exportar CSV</b>: descarga todas las iteraciones (valores de cada entrada, de cada celda de proceso y de cada salida) más el resumen y el tornado. Ábrelo en Excel para tus propios análisis.</li>
+        <li><b>Generar informe</b>: crea un informe con los resultados y estadísticas de la simulación.</li>
+      </ul>
+
+      <h2 id="m16">16. Limitaciones y buenas prácticas</h2>
+      <ul>
+        <li>El motor recalcula las funciones más habituales de Excel (SUMA, SI, PROMEDIO, BUSCARV, VNA, TIR, SUMAPRODUCTO…). Las fórmulas no soportadas conservan su último valor guardado y se marcan en naranja.</li>
+        <li>La simulación <b>no es mejor que sus supuestos</b>: si las distribuciones de entrada están mal estimadas, los resultados heredan ese error.</li>
+        <li>Una probabilidad no garantiza un resultado: 90&nbsp;% de probabilidad significa que 1 de cada 10 veces ocurre lo contrario.</li>
+        <li>Herramienta gratuita con fines educativos: <b>no constituye asesoría</b> financiera, contable ni de inversión. Valida siempre con estudios propios.</li>
+      </ul>
+      <p style="color:var(--texto2,#5b6b80);font-size:.85rem;margin-top:1.5em">© Juan Carlos Meza · Contenido bajo licencia CC BY-SA 4.0 · ¿Dudas o algo no funciona? Escribe a juanxmeza@gmail.com</p>
+      </div>
     </div>
   </section>
 </main>
@@ -2902,10 +3052,11 @@ $('btnEjemploLibro').addEventListener('click', () => {
     ctx.textAlign='left'; ctx.fillText('t=0', padL, H-6); ctx.textAlign='right'; ctx.fillText('T='+fmtNum(T), W-padR, H-6);
   }
   function verProc(v){
-    const vs=$('vistaSimulador'), vp=$('vistaProcesos'); if(!vs||!vp) return;
-    vs.style.display=v?'none':''; vp.style.display=v?'':'none';
+    const vs=$('vistaSimulador'), vp=$('vistaProcesos'), vm=$('vistaManual'); if(!vs||!vp) return;
+    vs.style.display=v?'none':''; vp.style.display=v?'':'none'; if(vm) vm.style.display='none';
     $('navSim').className='btn '+(v?'btn-secundario':'btn-primario');
     $('navProc').className='btn '+(v?'btn-primario':'btn-secundario');
+    if($('navMan')) $('navMan').className='btn btn-secundario';
   }
   const nS=$('navSim'), nP=$('navProc');
   if(nS&&nP){
@@ -2975,6 +3126,24 @@ function procRenderLista(){
   const pc=$('prProc'); if(pc) pc.addEventListener('change', procRenderCampos);
   const pa=$('prAceptar'); if(pa) pa.addEventListener('click', procGuardar);
   const px=$('prCancelar'); if(px) px.addEventListener('click', procCerrar);
+})();
+
+/* ===== Manual: navegacion y descarga ===== */
+(function(){
+  const nm=$('navMan');
+  if(nm) nm.addEventListener('click', function(){
+    $('vistaSimulador').style.display='none'; $('vistaProcesos').style.display='none'; $('vistaManual').style.display='';
+    $('navSim').className='btn btn-secundario'; $('navProc').className='btn btn-secundario'; $('navMan').className='btn btn-primario';
+    window.scrollTo(0,0);
+  });
+  const bd=$('btnDescargarManual');
+  if(bd) bd.addEventListener('click', function(){
+    const cont=$('manualContenido').innerHTML;
+    const estilo='<style>body{font:15px/1.6 system-ui,\'Segoe UI\',sans-serif;max-width:860px;margin:24px auto;padding:0 20px;color:#1a2230}h1{font-size:1.7rem}h2{font-size:1.3rem;margin-top:1.6em;border-bottom:2px solid #2f9e44;padding-bottom:5px}h3{font-size:1.05rem;color:#1d6b45}code{background:#eef2f7;padding:1px 6px;border-radius:4px}ol,ul{padding-left:22px}.toc{background:#f1f5f9;border-radius:10px;padding:12px 18px;columns:2;font-size:.9rem}.toc a{color:#2f6fed;text-decoration:none}.nota-m{background:#eef4ff;border-left:3px solid #2f6fed;padding:8px 12px;border-radius:6px;margin:.6em 0;font-size:.93em}</style>';
+    const html='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Manual — Simulador de Riesgos Monte Carlo</title>'+estilo+'</head><body>'+cont+'</body></html>';
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Manual-Simulador-MonteCarlo.html'; a.click(); URL.revokeObjectURL(a.href);
+  });
 })();
 </script>
 </body>
