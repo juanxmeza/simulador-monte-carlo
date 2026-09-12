@@ -9,3 +9,6 @@
 desktop.ini
 Thumbs.db
 ~$*
+
+# copias de respaldo locales, no versionar
+index.backup-*.html
