@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Simulador Monte Carlo · Arquitectura",
+    "output": "arquitectura.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "flujo",
+        "label": "Del Excel al informe",
+        "focus": [
+          "xlsx",
+          "parser",
+          "modelo",
+          "motor",
+          "salidas"
+        ],
+        "note": "Se arrastra el Excel, se marcan entradas y salidas, el motor muestrea y el informe resume percentiles, tornado y Sobol."
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [
+      40,
+      80
+    ],
+    "cols": 4,
+    "gapX": 110,
+    "gapY": 84,
+    "cellW": 170,
+    "cellH": 66
+  },
+  "components": [
+    {
+      "id": "usuario",
+      "type": "external",
+      "label": "Usuario",
+      "sublabel": "montecarlo.inicon.com.co",
+      "row": 1,
+      "col": 0,
+      "size": [
+        170,
+        66
+      ]
+    },
+    {
+      "id": "xlsx",
+      "type": "external",
+      "label": "Excel (.xlsx)",
+      "sublabel": "modelo del usuario",
+      "row": 0,
+      "col": 1,
+      "size": [
+        170,
+        66
+      ]
+    },
+    {
+      "id": "parser",
+      "type": "backend",
+      "label": "Lector de Excel",
+      "sublabel": "lee el .xlsx en el navegador",
+      "row": 1,
+      "col": 1,
+      "size": [
+        170,
+        66
+      ]
+    },
+    {
+      "id": "modelo",
+      "type": "backend",
+      "label": "Entradas y salidas",
+      "sublabel": "distribuciones · correlación",
+      "row": 1,
+      "col": 2,
+      "size": [
+        170,
+        66
+      ]
+    },
+    {
+      "id": "motor",
+      "type": "backend",
+      "label": "Motor Monte Carlo",
+      "sublabel": "LHS · Sobol · tornado",
+      "row": 1,
+      "col": 3,
+      "size": [
+        170,
+        66
+      ]
+    },
+    {
+      "id": "salidas",
+      "type": "frontend",
+      "label": "Informe",
+      "sublabel": "percentiles · VaR · equilibrio",
+      "row": 2,
+      "col": 3,
+      "size": [
+        170,
+        66
+      ]
+    },
+    {
+      "id": "export",
+      "type": "external",
+      "label": "CSV e informe",
+      "sublabel": "descarga · impresión",
+      "row": 2,
+      "col": 2,
+      "size": [
+        170,
+        66
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "GitHub Pages · un solo HTML · sin servidor · CC BY-SA 4.0",
+      "wraps": [
+        "parser",
+        "modelo",
+        "motor",
+        "salidas"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "usuario-parser",
+      "from": "usuario",
+      "to": "parser",
+      "label": "abre la página",
+      "variant": "emphasis"
+    },
+    {
+      "id": "xlsx-parser",
+      "from": "xlsx",
+      "to": "parser",
+      "label": "arrastrar",
+      "variant": "dashed",
+      "labelDy": 24
+    },
+    {
+      "id": "parser-modelo",
+      "from": "parser",
+      "to": "modelo",
+      "label": "celdas",
+      "variant": "emphasis"
+    },
+    {
+      "id": "modelo-motor",
+      "from": "modelo",
+      "to": "motor",
+      "label": "supuestos",
+      "variant": "emphasis"
+    },
+    {
+      "id": "motor-salidas",
+      "from": "motor",
+      "to": "salidas",
+      "label": "muestras",
+      "labelDy": 24
+    },
+    {
+      "id": "salidas-export",
+      "from": "salidas",
+      "to": "export",
+      "label": "exportar",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Capacidades",
+      "items": [
+        "Distribuciones ajustadas a datos históricos, correlación entre entradas",
+        "Series temporales (laboratorio de procesos estocásticos)"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Publicación",
+      "items": [
+        "Público en montecarlo.inicon.com.co (GitHub Pages)",
+        "Manual de usuario integrado en pestaña"
+      ]
+    }
+  ]
+}
