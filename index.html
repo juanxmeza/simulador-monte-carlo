@@ -28,9 +28,20 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--fondo);color:var(--texto);line-height:1.5;font-size:15px}
-  header.cabecera{background:linear-gradient(135deg,#173a2e 0%,#1d6b45 55%,#2f9e44 100%);color:#fff;padding:22px 24px 26px}
-  header.cabecera h1{font-size:1.5rem;font-weight:700}
-  header.cabecera p{opacity:.88;max-width:920px;margin-top:6px;font-size:.93rem}
+  /* ---- barra superior, igual a INICON IFC ---- */
+  header.barra-ifc{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;align-items:center;gap:4px;
+    background:#fff;border-bottom:1px solid var(--borde);padding:8px 16px;min-height:56px}
+  header.barra-ifc h1{font-size:15px;font-weight:700;white-space:nowrap;margin-right:6px}
+  header.barra-ifc .grupo{display:flex;align-items:center;gap:4px;padding-left:8px;margin-left:4px;border-left:1px solid var(--borde)}
+  header.barra-ifc .btn{display:inline-flex;align-items:center;gap:5px;height:34px;min-width:34px;justify-content:center;
+    padding:0 9px;background:#fff;color:var(--texto);border:1px solid #d3d9e3;border-radius:7px;font-size:13px;font-weight:500}
+  header.barra-ifc .btn:hover{background:#f1f4f9;filter:none}
+  header.barra-ifc .btn-primario{background:#e8f3ea;border-color:#9fd1ab;color:#1d6b45}
+  header.barra-ifc #btnEjecutar{background:var(--verde);border-color:var(--verde);color:#fff}
+  header.barra-ifc svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  body:has(#app[style*="none"]) #grupoSim, body:has(#app[style*="none"]) #grupoRes,
+  body:has(#vistaSimulador[style*="none"]) #grupoSim, body:has(#vistaSimulador[style*="none"]) #grupoRes{display:none}
+  .intro{color:var(--texto2);max-width:920px;margin:0 auto 14px;text-align:center;font-size:.93rem}
   main{max-width:1500px;margin:0 auto;padding:18px 16px 60px}
   .tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-radius:12px;box-shadow:var(--sombra);padding:16px;margin-bottom:14px}
   .tarjeta h2{font-size:1rem;margin-bottom:10px;display:flex;align-items:center;gap:8px}
@@ -167,23 +178,35 @@
 </head>
 <body>
 
-<header class="cabecera">
-  <h1>📊 Simulador de Riesgos Monte Carlo para Excel</h1>
-  <p>Carga tu libro de Excel (.xlsx), marca las celdas de <b>entrada</b> con su distribución de probabilidad y las celdas de
-  <b>salida</b> que quieres analizar. La simulación recalcula las fórmulas de tu modelo miles de veces y entrega la
-  distribución de probabilidad y el análisis estadístico completo de cada salida.</p>
+<header class="barra-ifc">
+  <h1 title="Simulador de Riesgos Monte Carlo para Excel">INICON Monte Carlo</h1>
+  <nav class="nav-vistas grupo">
+    <button type="button" class="btn btn-primario" id="navSim" title="Simular tu libro de Excel"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16v-4M12 16V8M17 16v-7"/></svg>Simulador</button>
+    <button type="button" class="btn btn-secundario" id="navProc" title="Procesos estocásticos (series en el tiempo)"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Procesos</button>
+    <button type="button" class="btn btn-secundario" id="navMan" title="Manual de uso"><svg viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 0 1 2-2h14v16H6.5a2.5 2.5 0 0 0 0 5H20"/></svg>Manual</button>
+  </nav>
+  <div class="grupo" id="grupoSim">
+    <button class="btn" id="btnEjecutar" title="Ejecutar la simulación"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>Ejecutar</button>
+    <button class="btn" id="btnRestablecer" title="Restablecer"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+  </div>
+  <div class="grupo" id="grupoRes">
+    <button class="btn" id="btnCSV" disabled title="Exportar resultados a CSV"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/></svg>CSV</button>
+    <button class="btn" id="btnInforme" disabled title="Generar informe"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Informe</button>
+    <button class="btn" id="btnSobol" title="Sensibilidad global (Sobol)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Sensibilidad</button>
+  </div>
+  <div class="grupo">
+    <button class="btn" type="button" title="Ayuda" onclick="document.getElementById('navMan').click()"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7M12 17h.01"/></svg></button>
+  </div>
 </header>
 
 <main>
-  <nav class="nav-vistas" style="display:flex;gap:8px;max-width:1360px;margin:0 auto 6px;padding:8px 24px 0;flex-wrap:wrap">
-    <button type="button" class="btn btn-primario" id="navSim">📊 Simulador (Excel)</button>
-    <button type="button" class="btn btn-secundario" id="navProc">🎲 Procesos estocásticos</button>
-    <button type="button" class="btn btn-secundario" id="navMan">📖 Manual</button>
-  </nav>
   <div id="vistaSimulador">
   <!-- ============ PANTALLA DE CARGA ============ -->
   <section id="pantallaCarga">
     <div class="tarjeta">
+      <p class="intro">Carga tu libro de Excel (.xlsx), marca las celdas de <b>entrada</b> con su distribución de probabilidad y las celdas de
+      <b>salida</b> que quieres analizar. La simulación recalcula las fórmulas de tu modelo miles de veces y entrega la
+      distribución de probabilidad y el análisis estadístico completo de cada salida.</p>
       <div class="zona-carga" id="zonaCarga">
         <div class="icono">📂</div>
         <h3>Arrastra aquí tu archivo de Excel (.xlsx)</h3>
@@ -231,11 +254,6 @@
           <label for="inpSemilla">Semilla (opcional)</label>
           <input type="number" id="inpSemilla" placeholder="Aleatoria" step="1">
         </div>
-        <button class="btn btn-primario" id="btnEjecutar">▶ Ejecutar simulación</button>
-        <button class="btn btn-secundario" id="btnRestablecer">Restablecer</button>
-        <button class="btn btn-secundario" id="btnCSV" disabled>Exportar CSV</button>
-        <button class="btn btn-secundario" id="btnInforme" disabled>Generar informe</button>
-        <button class="btn btn-secundario" id="btnSobol">🌐 Sensibilidad global</button>
       </div>
       <div id="alertas"></div>
       <div class="progreso" id="cajaProgreso"><div class="barra" id="barraProgreso"></div></div>
@@ -393,7 +411,7 @@
 
       <h2 id="m2">2. Primeros pasos: cargar tu Excel</h2>
       <ol>
-        <li>Abre la app. Verás tres pestañas arriba: <b>📊 Simulador (Excel)</b>, <b>🎲 Procesos estocásticos</b> y <b>📖 Manual</b>. Empieza en la primera.</li>
+        <li>Abre la app. Verás tres pestañas arriba: <b>Simulador</b>, <b>Procesos</b> y <b>Manual</b>. Empieza en la primera. Al cargar un archivo aparecen en la misma barra los botones <b>Ejecutar</b>, <b>Restablecer</b> (flecha circular), <b>CSV</b>, <b>Informe</b> y <b>Sensibilidad</b>. El botón <b>?</b> abre este manual.</li>
         <li>Arrastra tu archivo <code>.xlsx</code> a la zona de carga, o haz clic para seleccionarlo. Si no tienes uno, pulsa <b>«🧪 Genera un modelo de ejemplo»</b> para practicar.</li>
         <li>El archivo se procesa <b>en tu navegador</b>: no se sube a ningún servidor.</li>
       </ol>
@@ -454,7 +472,7 @@
         <li><b>Iteraciones</b>: cuántas veces se recalcula el modelo (1.000–50.000, o manual). Más iteraciones = resultados más estables.</li>
         <li><b>Muestreo</b>: <b>Hipercubo Latino</b> (por defecto, converge mejor con las mismas iteraciones) o <b>Aleatorio simple</b>.</li>
         <li><b>Semilla</b> (opcional): fija un número para obtener siempre el mismo resultado (reproducible); déjala vacía para que sea aleatoria.</li>
-        <li>Pulsa <b>«▶ Ejecutar simulación»</b>.</li>
+        <li>Pulsa <b>«Ejecutar»</b> (botón verde de la barra de arriba).</li>
       </ul>
 
       <h2 id="m10">10. Interpretar los resultados</h2>
@@ -473,15 +491,15 @@
       <p>En el bloque <b>🎯 Punto de equilibrio</b> eliges una entrada y la app calcula qué valor de esa entrada lleva la salida a un objetivo (por defecto 0), con las demás en su valor base. La <b>«holgura»</b> es cuánto puede moverse esa entrada antes de cruzar el objetivo. Equivale al «Buscar objetivo» de Excel.</p>
 
       <h2 id="m13">13. Sensibilidad global (Sobol)</h2>
-      <p>El botón <b>«🌐 Sensibilidad global»</b> calcula los <b>índices de Sobol</b>: <b>S₁</b> (primer orden) mide cuánto explica cada entrada <b>por sí sola</b>; <b>Sₜ</b> (total) incluye sus <b>interacciones</b> con otras. Si Sₜ es bastante mayor que S₁, esa entrada actúa combinada. Si ΣS₁ ≈ 100&nbsp;%, el modelo es casi aditivo. Es más completo que el tornado, pero tarda más (hace (K+2)×N evaluaciones).</p>
+      <p>El botón <b>«Sensibilidad»</b> calcula los <b>índices de Sobol</b>: <b>S₁</b> (primer orden) mide cuánto explica cada entrada <b>por sí sola</b>; <b>Sₜ</b> (total) incluye sus <b>interacciones</b> con otras. Si Sₜ es bastante mayor que S₁, esa entrada actúa combinada. Si ΣS₁ ≈ 100&nbsp;%, el modelo es casi aditivo. Es más completo que el tornado, pero tarda más (hace (K+2)×N evaluaciones).</p>
 
       <h2 id="m14">14. Laboratorio de procesos estocásticos</h2>
       <p>La pestaña <b>🎲 Procesos estocásticos</b> es un banco de pruebas: eliges un proceso (GBM, Ornstein-Uhlenbeck, etc.), sus parámetros, el horizonte y el número de trayectorias, y ves el <b>gráfico de caminos + la media</b> y las <b>estadísticas del valor final</b>. Úsalo para <b>explorar y calibrar</b> un proceso antes de usarlo como «entrada de proceso» en tu modelo.</p>
 
       <h2 id="m15">15. Exportar (CSV e informe)</h2>
       <ul>
-        <li><b>Exportar CSV</b>: descarga todas las iteraciones (valores de cada entrada, de cada celda de proceso y de cada salida) más el resumen y el tornado. Ábrelo en Excel para tus propios análisis.</li>
-        <li><b>Generar informe</b>: crea un informe con los resultados y estadísticas de la simulación.</li>
+        <li><b>CSV</b>: descarga todas las iteraciones (valores de cada entrada, de cada celda de proceso y de cada salida) más el resumen y el tornado. Ábrelo en Excel para tus propios análisis.</li>
+        <li><b>Informe</b>: crea un informe con los resultados y estadísticas de la simulación.</li>
       </ul>
 
       <h2 id="m16">16. Limitaciones y buenas prácticas</h2>
@@ -2347,7 +2365,7 @@ $('btnEjecutar').addEventListener('click', () => {
 
   simulando = true;
   $('btnEjecutar').disabled = true;
-  $('btnEjecutar').textContent = '⏳ Simulando…';
+  $('btnEjecutar').dataset.h = $('btnEjecutar').innerHTML; $('btnEjecutar').textContent = '⏳ Simulando…';
   progreso(true, 0);
   const t0 = performance.now();
   /* Fase A: generar todas las muestras de entrada (rápido, sin evaluar fórmulas) */
@@ -2404,7 +2422,7 @@ $('btnEjecutar').addEventListener('click', () => {
 function finalizarSimulacion(datos){
   simulando = false;
   $('btnEjecutar').disabled = false;
-  $('btnEjecutar').textContent = '▶ Ejecutar simulación';
+  $('btnEjecutar').innerHTML = $('btnEjecutar').dataset.h || 'Ejecutar';
   progreso(false, 1);
   const N = datos.cfg.iteraciones;
   const analisis = salidas.map((s, k) => {
@@ -2978,7 +2996,7 @@ $('btnEjemploLibro').addEventListener('click', () => {
     { clave: H + '!B10', hoja: H, ref: 'B10', nombre: 'Total de Ingresos' }
   ];
   refrescarDefs();
-  mostrarAlertas(['Modelo de ejemplo generado con 3 entradas (verde) y 2 salidas (azul) ya definidas. Pulsa «Ejecutar simulación».'], 'info');
+  mostrarAlertas(['Modelo de ejemplo generado con 3 entradas (verde) y 2 salidas (azul) ya definidas. Pulsa «Ejecutar» (botón verde de la barra de arriba).'], 'info');
 });
 
 
