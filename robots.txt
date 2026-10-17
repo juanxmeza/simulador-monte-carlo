@@ -1,0 +1,5 @@
+# Simulador de Riesgos Monte Carlo de INICON — herramienta pública.
+User-agent: *
+Allow: /
+
+Sitemap: https://montecarlo.inicon.com.co/sitemap.xml
