@@ -1,0 +1,5 @@
+# GitHub Pages (Jekyll): archivos de trabajo que no se publican en el sitio.
+# Siguen en el repositorio; solo no quedan como paginas del sitio.
+exclude:
+  - ARQUITECTURA.md
+  - docs/
